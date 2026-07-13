@@ -47,6 +47,10 @@ Application-specific Kconfig options live in `Kconfig`, for example:
 
 - `CONFIG_KWS_EMA_ALPHA` — exponential moving-average coefficient for class
   probability (units of 1/1000).
+- `CONFIG_KWS_ONLY` — skip the gesture engine so the app boots without a
+  BMI270 wired up. Useful for KWS-only development, since the IMU's only 5V
+  source is the DK and it otherwise has to be jumper-wired in for the app to
+  boot at all.
 
 ## Layout
 

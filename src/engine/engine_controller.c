@@ -15,12 +15,20 @@
 LOG_MODULE_REGISTER(engine_ctrl);
 
 extern const engine_t kws_engine;
+#if !defined(CONFIG_KWS_ONLY)
 extern const engine_t gesture_engine;
+#endif
 
-/* Active engine on boot is engines[0]. A switch request advances round-robin. */
+/* Active engine on boot is engines[0]. A switch request advances.
+ * CONFIG_KWS_ONLY drops the gesture engine so the app never calls its init()
+ * (and therefore never touches the BMI270), for development without the
+ * IMU wired up.
+ */
 static const engine_t *const engines[] = {
 	&kws_engine,
+#if !defined(CONFIG_KWS_ONLY)
 	&gesture_engine,
+#endif
 };
 
 static size_t active_idx;

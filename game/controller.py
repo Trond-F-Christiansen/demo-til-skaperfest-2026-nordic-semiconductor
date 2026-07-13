@@ -1,16 +1,17 @@
-"""Voice controller: reads keyword-spotting events from the device over serial.
+"""Voice/gesture controller: reads BLE-relayed commands from the DK over serial.
 
-The ww_kws firmware emits plain-text lines on its control-output UART (VCOM0),
-notably:
+The game_controller dongle sends direction commands over BLE (Nordic UART
+Service); the game_receiver app on the DK acts as the BLE central and relays
+each one onto its console UART as a plain-text line, notably:
 
-    Keyword spotted: Up
-    Keyword spotted: Down
-    Keyword spotted: Left
-    Keyword spotted: Right
+    Command: UP
+    Command: DOWN
+    Command: LEFT
+    Command: RIGHT
 
 This module opens the serial port in a background thread, parses those lines and
 pushes the corresponding direction onto a thread-safe queue that the game loop
-drains. Non-direction keywords (and all other status lines) are ignored.
+drains. Non-direction commands (and all other status lines) are ignored.
 """
 
 from __future__ import annotations
@@ -30,13 +31,13 @@ except ImportError as exc:  # pragma: no cover - import guard
 
 # Directions are (dx, dy) with y growing downwards, matching screen coordinates.
 DIRECTIONS = {
-    "Up": (0, -1),
-    "Down": (0, 1),
-    "Left": (-1, 0),
-    "Right": (1, 0),
+    "UP": (0, -1),
+    "DOWN": (0, 1),
+    "LEFT": (-1, 0),
+    "RIGHT": (1, 0),
 }
 
-_KEYWORD_RE = re.compile(r"Keyword spotted:\s*(\w+)")
+_KEYWORD_RE = re.compile(r"Command:\s*(\w+)")
 
 # USB vendor IDs of the debug probes used on Nordic DKs (SEGGER J-Link OB,
 # Nordic Semiconductor), used to pick out candidate ports.

@@ -13,7 +13,7 @@
 
 #include "dmic.h"
 #include "kws.h"
-#include "nrf_edgeai_generated/nrf_edgeai_user_model.h"
+#include "Snake_94502_kws/nrf_edgeai_generated/nrf_edgeai_user_model.h"
 
 LOG_MODULE_REGISTER(kws);
 
@@ -23,6 +23,7 @@ LOG_MODULE_REGISTER(kws);
 /* Classes predicted by keyword spotting model. The need to stay in sync with used model.
  * It will be subject to change how this classes are defined.
  */
+/*
 enum keyword_class {
 	KEYWORD_DOWN,
 	KEYWORD_GO,
@@ -38,15 +39,30 @@ enum keyword_class {
 	KEYWORD_YES,
 	KEYWORDS_COUNT
 };
+*/
+
+/* Order must match this model's actual output index order, documented in
+ * Snake_94502_kws/nrf_edgeai_generated/nrf_edgeai_user_model_labels.h
+ * (OTHER, SILENCE, down, left, right, up).
+ */
+enum keyword_class {
+	KEYWORD_UNKNOWN,
+	KEYWORD_SILENCE,
+	KEYWORD_DOWN,
+	KEYWORD_LEFT,
+	KEYWORD_RIGHT,
+	KEYWORD_UP,
+	KEYWORDS_COUNT
+};
 
 struct keyword_detection_ctx {
 	const char *name;
 	const float threshold;
 	const uint8_t num_in_row;
 };
-
+/*
 static const struct keyword_detection_ctx keyword_detection_ctxs[] = {
-	[KEYWORD_DOWN] = {.name = "Down", .threshold = 0.6f, .num_in_row = 13},
+	[KEYWORD_DOWN] = {.name = "Down", .threshold = 0.5f, .num_in_row = 10},
 	[KEYWORD_GO] = {.name = "Go", .threshold = 0.99f, .num_in_row = 22},
 	[KEYWORD_LEFT] = {.name = "Left", .threshold = 0.7f, .num_in_row = 13},
 	[KEYWORD_NO] = {.name = "No", .threshold = 0.99f, .num_in_row = 22},
@@ -58,6 +74,16 @@ static const struct keyword_detection_ctx keyword_detection_ctxs[] = {
 	[KEYWORD_UNKNOWN] = {.name = "Unknown", .threshold = 0.99f, .num_in_row = 22},
 	[KEYWORD_UP] = {.name = "Up", .threshold = 0.7f, .num_in_row = 13},
 	[KEYWORD_YES] = {.name = "Yes", .threshold = 0.99f, .num_in_row = 22},
+};
+*/
+
+static const struct keyword_detection_ctx keyword_detection_ctxs[] = {
+	[KEYWORD_LEFT] = {.name = "Left", .threshold = 0.3f, .num_in_row = 5},
+	[KEYWORD_DOWN] = {.name = "Down", .threshold = 0.3f, .num_in_row = 5},
+	[KEYWORD_RIGHT] = {.name = "Right", .threshold = 0.3f, .num_in_row = 5},
+	[KEYWORD_UP] = {.name = "Up", .threshold = 0.3f, .num_in_row = 5},
+	[KEYWORD_SILENCE] = {.name = "Silence", .threshold = 0.99f, .num_in_row = 22},
+	[KEYWORD_UNKNOWN] = {.name = "Unknown", .threshold = 0.99f, .num_in_row = 22},
 };
 
 BUILD_ASSERT(KEYWORDS_COUNT == ARRAY_SIZE(keyword_detection_ctxs),
@@ -77,7 +103,7 @@ static nrf_edgeai_t *kws_model;
 
 int kws_init(void)
 {
-	kws_model = nrf_edgeai_user_model_kws();
+	kws_model = nrf_edgeai_user_model_94502();
 	__ASSERT_NO_MSG(kws_model);
 	__ASSERT_NO_MSG(nrf_edgeai_model_outputs_num(kws_model) == KEYWORDS_COUNT);
 	__ASSERT_NO_MSG(nrf_edgeai_input_window_size(kws_model) == DMIC_SAMPLES_IN_BLOCK);

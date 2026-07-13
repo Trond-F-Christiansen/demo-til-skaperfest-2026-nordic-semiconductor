@@ -128,8 +128,8 @@ static void kws_engine_run(atomic_t *stop)
 		}
 
 		if (prediction.valid) {
-			LOG_INF("Keyword: %s (class %u, prob %.2f)", prediction.name,
-				prediction.class, (double)prediction.avg_probability);
+			//LOG_INF("Keyword: %s (class %u, prob %.2f)", prediction.name,
+			//						prediction.class, (double)prediction.avg_probability);
 
 			/* Low-latency control output for the serial game controller,
 			 * matching the ww_kws "Keyword spotted: X" format. printk is
