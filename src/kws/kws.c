@@ -101,6 +101,15 @@ static const enum game_command keyword_commands[KEYWORDS_COUNT] = {
 
 static nrf_edgeai_t *kws_model;
 
+/* Postprocessing state, tracked across calls to detect a keyword sustained
+ * over num_in_row frames. Cleared by kws_reset() so a new session (e.g. after
+ * switching engines) never inherits a partial count from the previous one.
+ */
+static enum keyword_class last_class;
+static int count;
+static bool armed = true;
+static float probability_ema;
+
 int kws_init(void)
 {
 	kws_model = nrf_edgeai_user_model_94502();
@@ -124,12 +133,6 @@ static void kws_postprocess(struct kws_prediction *const prediction)
 	prediction->command = GAME_CMD_NONE;
 
 	const float alpha = CONFIG_KWS_EMA_ALPHA / 1000.0f;
-	static enum keyword_class last_class;
-	static int count;
-	static bool armed = true;
-
-	/* Exponential moving average of class probability. */
-	static float probability_ema;
 
 	const uint16_t predicted_class = kws_model->decoded_output.classif.predicted_class;
 
@@ -211,4 +214,9 @@ int kws_process(uint8_t *const audio_buffer, const uint16_t num_samples,
 void kws_reset(void)
 {
 	nrf_edgeai_model_axon_init_persistent_vars(kws_model);
+
+	last_class = KEYWORD_UNKNOWN;
+	count = 0;
+	armed = true;
+	probability_ema = 0.0f;
 }

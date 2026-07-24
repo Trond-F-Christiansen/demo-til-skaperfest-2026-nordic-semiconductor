@@ -21,7 +21,7 @@ static nrf_edgeai_t *gesture_model;
 
 int gesture_init(void)
 {
-	gesture_model = nrf_edgeai_user_model_36038();
+	gesture_model = nrf_edgeai_user_model_94854();
 	__ASSERT_NO_MSG(gesture_model);
 
 	nrf_edgeai_err_t err = nrf_edgeai_init(gesture_model);
@@ -84,6 +84,12 @@ int gesture_process(const float *const features, const uint16_t num_features,
 			break;
 		case CLASS_LABEL_SWIPE_RIGHT:
 			prediction->command = GAME_CMD_RIGHT;
+			break;
+		case CLASS_LABEL_SWIPE_UP:
+			prediction->command = GAME_CMD_UP;
+			break;
+		case CLASS_LABEL_SWIPE_DOWN:
+			prediction->command = GAME_CMD_DOWN;
 			break;
 		default:
 			break;
