@@ -15,6 +15,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/atomic.h>
+#include <zephyr/sys/util.h>
 
 #include "ble/ble_nus.h"
 #include "engine.h"
@@ -42,28 +43,63 @@ LOG_MODULE_REGISTER(gesture_engine);
  *
  * So: feed every sample continuously, same as before, keeping the window
  * always naturally fresh. Motion gating instead decides which resulting
- * prediction to act on -- discard everything while idle or cooling down,
- * accept only the first prediction that completes while armed. That still
- * gives one clean, motion-aligned prediction per gesture instead of a flood
- * of overlapping ones; it just doesn't save the inference cycles idle would
- * otherwise skip, since the runtime doesn't support "emptying" the window.
+ * prediction to act on. Two capture triggers were tried and rejected before
+ * this one:
+ *   - Capture right at onset: onset confirms after ~30ms above threshold,
+ *     but the window is a continuous ~640ms trailing buffer, so that window
+ *     is almost entirely pre-swipe idle content -- confident IDLE (or a
+ *     confident wrong direction on partial signal) instead of the intended
+ *     gesture.
+ *   - Capture at offset (magnitude decays back below threshold): measured
+ *     on-device, onset-to-offset spans ran 0.56-2.7s -- the natural
+ *     deceleration/oscillation tail lingers far longer than the ~300-500ms
+ *     swipe burst itself (per offline burst_detection.py analysis). By the
+ *     time offset fired, the window had long since slid past the actual
+ *     swipe and was capturing the settle tail instead -- confident IDLE
+ *     again, just for a different reason.
+ *
+ * Neither onset nor offset is a reliable timing anchor, since both are
+ * magnitude-threshold events and the decay tail is not. Capture is instead
+ * anchored on a *fixed delay* from onset (MOTION_CAPTURE_DELAY_N), sized to
+ * the known burst duration -- independent of how long the tail rings on
+ * for. The offset threshold is kept, but only to gate re-arming (COOLDOWN):
+ * without it, lingering decay motion after a capture would immediately
+ * re-trigger onset on the same physical gesture.
  *
  * Onset/offset detection reuses the same signal as the offline labeling
  * tool (burst_detection.py): smoothed gyro-magnitude energy above an
  * adaptively tracked idle baseline, self-calibrating to the live sensor's
- * idle noise floor. MOTION_ONSET_K/MOTION_OFFSET_K are the knobs to retune
- * on real hardware if onset detection is too eager or too sluggish.
+ * idle noise floor. MOTION_ONSET_K/MOTION_OFFSET_K/MOTION_CAPTURE_DELAY_N
+ * are the knobs to retune on real hardware.
  */
-#define MOTION_BASELINE_ALPHA   0.02f /* idle baseline/deviation EMA weight per sample */
-#define MOTION_ONSET_K          4.0f  /* onset when magnitude > baseline + K * deviation */
-#define MOTION_OFFSET_K         1.5f  /* offset when magnitude < baseline + K * deviation */
-#define MOTION_ONSET_CONFIRM_N  3     /* consecutive above-threshold samples to confirm onset */
-#define MOTION_OFFSET_CONFIRM_N 10    /* consecutive below-threshold samples to confirm offset */
+#define MOTION_BASELINE_ALPHA    0.02f /* idle baseline/deviation EMA weight per sample */
+#define MOTION_MIN_DEVIATION     0.05f /* deviation floor -- see block comment below */
+#define MOTION_ONSET_K           4.0f  /* onset when magnitude > baseline + K * deviation */
+#define MOTION_OFFSET_K          2.0f  /* re-arm when magnitude < baseline + K * deviation */
+#define MOTION_ONSET_CONFIRM_N   3     /* consecutive above-threshold samples to confirm onset */
+#define MOTION_OFFSET_CONFIRM_N  5     /* consecutive below-threshold samples to confirm re-arm */
+#define MOTION_CAPTURE_DELAY_N   35    /* samples (~350ms @ 100Hz) after onset before capturing */
+#define MOTION_COOLDOWN_TIMEOUT_N 200  /* samples (~2s @ 100Hz) hard cap on COOLDOWN -- see below */
+
+/*
+ * baseline/deviation are only updated while IDLE (see the IDLE case below), so
+ * whatever they were when onset fired is frozen through ARMED/CAPTURE/COOLDOWN.
+ * When the device is left perfectly still -- e.g. flat on a table -- deviation
+ * converges toward zero there, and MOTION_OFFSET_K * deviation collapses the
+ * COOLDOWN offset threshold to almost exactly baseline. Once the device is
+ * picked up again, ordinary hand-held noise sits above that stale threshold,
+ * so the "N consecutive samples below threshold" re-arm condition is never
+ * satisfied and the gate sticks in COOLDOWN forever (no further predictions
+ * until an engine switch resets it). MOTION_MIN_DEVIATION floors deviation so
+ * the threshold can't collapse like that; MOTION_COOLDOWN_TIMEOUT_N is a
+ * second, independent safety net that force-re-arms after a bounded time.
+ */
 
 enum motion_state {
 	MOTION_STATE_IDLE,     /* watching for onset; completed windows are discarded */
-	MOTION_STATE_ARMED,    /* onset confirmed; the next completed window is accepted */
-	MOTION_STATE_COOLDOWN, /* prediction accepted; watching for offset before re-arming */
+	MOTION_STATE_ARMED,    /* onset confirmed; waiting out the expected burst duration */
+	MOTION_STATE_CAPTURE,  /* delay elapsed; the next completed window is accepted */
+	MOTION_STATE_COOLDOWN, /* captured; watching for the decay tail to settle before re-arming */
 };
 
 static struct {
@@ -72,6 +108,7 @@ static struct {
 	float deviation;
 	bool baseline_init;
 	int confirm_count;
+	int cooldown_ticks;
 } motion = {
 	.state = MOTION_STATE_IDLE,
 };
@@ -81,6 +118,7 @@ static void motion_engine_reset(void)
 	motion.state = MOTION_STATE_IDLE;
 	motion.baseline_init = false;
 	motion.confirm_count = 0;
+	motion.cooldown_ticks = 0;
 }
 
 static float gyro_magnitude(const imu_data_t *imu_data)
@@ -106,6 +144,7 @@ static void motion_track(float magnitude)
 			motion.baseline += MOTION_BASELINE_ALPHA * (magnitude - motion.baseline);
 			motion.deviation += MOTION_BASELINE_ALPHA *
 					     (fabsf(magnitude - motion.baseline) - motion.deviation);
+			motion.deviation = MAX(motion.deviation, MOTION_MIN_DEVIATION);
 		}
 
 		const float onset_threshold = motion.baseline + MOTION_ONSET_K * motion.deviation;
@@ -126,6 +165,16 @@ static void motion_track(float magnitude)
 		return;
 
 	case MOTION_STATE_ARMED:
+		if (++motion.confirm_count < MOTION_CAPTURE_DELAY_N) {
+			return;
+		}
+
+		LOG_DBG("Capture delay elapsed, capturing next window");
+		motion.confirm_count = 0;
+		motion.state = MOTION_STATE_CAPTURE;
+		return;
+
+	case MOTION_STATE_CAPTURE:
 		/* Nothing to track; waiting for the next completed window. */
 		return;
 
@@ -134,16 +183,21 @@ static void motion_track(float magnitude)
 
 		if (magnitude >= offset_threshold) {
 			motion.confirm_count = 0;
+		} else if (++motion.confirm_count >= MOTION_OFFSET_CONFIRM_N) {
+			LOG_DBG("Motion settled, re-armed");
+			motion.confirm_count = 0;
+			motion.state = MOTION_STATE_IDLE;
 			return;
 		}
 
-		if (++motion.confirm_count < MOTION_OFFSET_CONFIRM_N) {
-			return;
+		/* Safety net: force re-arm if offset never confirms (e.g. the
+		 * device was picked up into a higher noise floor than the frozen
+		 * threshold), so the gate can't stick in COOLDOWN forever. */
+		if (++motion.cooldown_ticks >= MOTION_COOLDOWN_TIMEOUT_N) {
+			LOG_DBG("Cooldown timeout, re-armed");
+			motion.confirm_count = 0;
+			motion.state = MOTION_STATE_IDLE;
 		}
-
-		LOG_DBG("Motion settled, re-armed");
-		motion.confirm_count = 0;
-		motion.state = MOTION_STATE_IDLE;
 		return;
 	}
 	}
@@ -232,13 +286,15 @@ static void gesture_engine_run(atomic_t *stop)
 			continue;
 		}
 
-		/* Only the first window that completes while armed gets
-		 * acted on; everything else (idle, or still cooling down) is
-		 * discarded even though the model still runs on it. */
-		const bool accept = (motion.state == MOTION_STATE_ARMED);
+		/* Only the first window that completes after the capture delay
+		 * elapses gets acted on; everything else (idle, mid-gesture, or
+		 * still cooling down) is discarded even though the model still
+		 * runs on it. */
+		const bool accept = (motion.state == MOTION_STATE_CAPTURE);
 
 		if (accept) {
 			motion.state = MOTION_STATE_COOLDOWN;
+			motion.cooldown_ticks = 0;
 		}
 
 		if (err) {

@@ -78,10 +78,10 @@ static const struct keyword_detection_ctx keyword_detection_ctxs[] = {
 */
 
 static const struct keyword_detection_ctx keyword_detection_ctxs[] = {
-	[KEYWORD_LEFT] = {.name = "Left", .threshold = 0.3f, .num_in_row = 5},
-	[KEYWORD_DOWN] = {.name = "Down", .threshold = 0.3f, .num_in_row = 5},
-	[KEYWORD_RIGHT] = {.name = "Right", .threshold = 0.3f, .num_in_row = 5},
-	[KEYWORD_UP] = {.name = "Up", .threshold = 0.3f, .num_in_row = 5},
+	[KEYWORD_LEFT] = {.name = "Left", .threshold = 0.2f, .num_in_row = 2},
+	[KEYWORD_DOWN] = {.name = "Down", .threshold = 0.2f, .num_in_row = 2},
+	[KEYWORD_RIGHT] = {.name = "Right", .threshold = 0.2f, .num_in_row = 2},
+	[KEYWORD_UP] = {.name = "Up", .threshold = 0.2f, .num_in_row = 2},
 	[KEYWORD_SILENCE] = {.name = "Silence", .threshold = 0.99f, .num_in_row = 22},
 	[KEYWORD_UNKNOWN] = {.name = "Unknown", .threshold = 0.99f, .num_in_row = 22},
 };
