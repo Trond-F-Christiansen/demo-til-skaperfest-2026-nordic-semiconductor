@@ -15,6 +15,7 @@
 LOG_MODULE_REGISTER(engine_ctrl);
 
 extern const engine_t kws_engine;
+extern const engine_t kws_mine_engine; //model for minesweeper
 #if !defined(CONFIG_KWS_ONLY)
 extern const engine_t gesture_engine;
 #endif
@@ -26,6 +27,7 @@ extern const engine_t gesture_engine;
  */
 static const engine_t *const engines[] = {
 	&kws_engine,
+	&kws_mine_engine,
 #if !defined(CONFIG_KWS_ONLY)
 	&gesture_engine,
 #endif

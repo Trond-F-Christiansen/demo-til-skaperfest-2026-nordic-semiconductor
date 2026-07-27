@@ -142,3 +142,16 @@ int ble_nus_send_command(enum game_command cmd)
 
 	return bt_nus_send(nus_conn, (const uint8_t *)token, (uint16_t)strlen(token));
 }
+
+int ble_nus_send_raw(const char *token)
+{
+	if (token == NULL) {
+		return -EINVAL;
+	}
+
+	if (!nus_conn || !nus_send_enabled) {
+		return -ENOTCONN;
+	}
+
+	return bt_nus_send(nus_conn, (const uint8_t *)token, (uint16_t)strlen(token));
+}

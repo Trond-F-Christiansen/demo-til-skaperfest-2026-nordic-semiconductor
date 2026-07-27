@@ -196,7 +196,8 @@ game_font = pygame.font.Font('Font/PoetsenOne-Regular.ttf', 25)
 SCREEN_UPDATE = pygame.USEREVENT
 pygame.time.set_timer(SCREEN_UPDATE, 400) 
 
-controller = SerialController(baudrate=115200)  # port=None => auto-detect
+#controller = SerialController(baudrate=115200)  # port=None => auto-detect
+controller = SerialController(port='/dev/ttyACM1', baudrate=115200)
 controller.start()
 
 main_game = MAIN()
