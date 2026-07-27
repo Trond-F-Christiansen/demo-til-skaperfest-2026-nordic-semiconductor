@@ -24,6 +24,7 @@ single hook in choose(); see the note there. Nothing else needs to change.
 
 import pygame
 
+import quiz
 import snake
 from controller import SerialController
 
@@ -31,7 +32,7 @@ from controller import SerialController
 WINDOW_SIZE = (snake.cell_number * snake.cell_size,
                snake.cell_number * snake.cell_size)
 
-BG_COLOR = (175, 215, 70)
+BG_COLOR = (10, 10, 255)
 TEXT_COLOR = (56, 64, 12)
 HILITE_BG = (167, 209, 61)
 
@@ -49,6 +50,7 @@ class Game:
 # Registry of playable games -- extend this as games are added.
 GAMES = [
     Game("Snake", snake.run),
+    Game("Quiz", quiz.run),
     # Game("Tetris", tetris.run),
 ]
 
