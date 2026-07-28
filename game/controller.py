@@ -205,6 +205,30 @@ class SerialController:
         if self._serial is not None:
             self._serial.close()
 
+    #---new function-----
+    #send scores to 54
+    def send_score(self, game: str, score: int, extra: dict | None = None) -> None:
+        """Send a highscore line to the DK, which forwards it to the nRF9151.
+
+        Format: <game>|<json>\n
+        """
+        if self._serial is None:
+            print("[controller] cannot send score: serial not open")
+            return
+
+        import json
+
+        payload = {"score": score}
+        if extra:
+            payload.update(extra)
+
+        line = "%s|%s\n" % (game, json.dumps(payload))
+        try:
+            self._serial.write(line.encode("utf-8"))
+            print(f"[controller] score sent: {line.strip()}")
+        except (serial.SerialException, OSError) as exc:
+            print(f"[controller] failed to send score: {exc}")
+
     def _run(self) -> None:
         assert self._serial is not None
         while not self._stop.is_set():
@@ -231,7 +255,7 @@ if __name__ == "__main__":
     NAMES = {v: k for k, v in DIRECTIONS.items()}
 
     #controller = SerialController(port, baud)
-    controller = SerialController(port='/dev/ttyACM1', baudrate=115200)
+    controller = SerialController(port='/dev/ttyACM3', baudrate=115200)
     controller.start()
     print(f"Listening on {controller.port} @ {baud} (Ctrl-C to stop)...")
     try:
