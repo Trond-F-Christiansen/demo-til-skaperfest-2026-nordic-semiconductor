@@ -1,0 +1,14 @@
+/*
+ * Copyright (c) 2024 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+/* uart1 doubles as the link to the nRF54LM20's camera firmware.
+ * CONFIG_NRF_MODEM_LIB_TRACE is explicitly disabled in prj.conf so the
+ * modem trace subsystem doesn't also try to drive this same UART.
+ */
+&uart1 {
+	status = "okay";
+	current-speed = <115200>;
+};

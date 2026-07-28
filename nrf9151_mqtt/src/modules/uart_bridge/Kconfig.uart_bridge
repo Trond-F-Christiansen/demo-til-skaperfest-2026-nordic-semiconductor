@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "UART bridge"
+
+module = MQTT_SAMPLE_UART_BRIDGE
+module-str = UART bridge
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # UART bridge
