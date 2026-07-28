@@ -32,11 +32,12 @@ from controller import SerialController
 WINDOW_SIZE = (snake.cell_number * snake.cell_size,
                snake.cell_number * snake.cell_size)
 
-BG_COLOR = (10, 10, 255)
-TEXT_COLOR = (56, 64, 12)
-HILITE_BG = (167, 209, 61)
+BG_COLOR = "#34C3D5"
+TEXT_COLOR = (255, 255, 255)
+HILITE_BG = "#003C66"
 
 FONT_PATH = 'Font/PoetsenOne-Regular.ttf'
+FONT_PATH_HELVETICA = "Font/Helvetica.ttf"
 
 
 class Game:
@@ -64,10 +65,10 @@ def choose(screen, clock, controller, title, options, subtitle=None):
 
     Keyboard-only: UP/DOWN move the highlight, ENTER/SPACE confirm.
     """
-    title_font = pygame.font.Font(FONT_PATH, 72)
-    sub_font = pygame.font.Font(FONT_PATH, 36)
-    item_font = pygame.font.Font(FONT_PATH, 48)
-    hint_font = pygame.font.Font(FONT_PATH, 24)
+    title_font = pygame.font.Font(FONT_PATH_HELVETICA, 72)
+    sub_font = pygame.font.Font(FONT_PATH_HELVETICA, 36)
+    item_font = pygame.font.Font(FONT_PATH_HELVETICA, 48)
+    hint_font = pygame.font.Font(FONT_PATH_HELVETICA, 24)
 
     selected = 0
     cx = WINDOW_SIZE[0] // 2
