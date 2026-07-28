@@ -41,12 +41,14 @@ static const char *get_name_by_target(uint8_t predicted_target)
 	static const char * const LABEL_VS_NAME[] = {
 		[CLASS_LABEL_IDLE]           = "IDLE",
 		[CLASS_LABEL_UNKNOWN]        = "UNKNOWN",
+		[CLASS_LABEL_SWIPE_UP]       = "SWIPE UP",
 		[CLASS_LABEL_SWIPE_LEFT]     = "SWIPE LEFT",
 		[CLASS_LABEL_SWIPE_RIGHT]    = "SWIPE RIGHT",
-		[CLASS_LABEL_DOUBLE_SHAKE]   = "DOUBLE SHAKE",
-		[CLASS_LABEL_DOUBLE_THUMB]   = "DOUBLE THUMB",
-		[CLASS_LABEL_ROTATION_RIGHT] = "ROTATION RIGHT",
-		[CLASS_LABEL_ROTATION_LEFT]  = "ROTATION LEFT"
+		//[CLASS_LABEL_DOUBLE_SHAKE]   = "DOUBLE SHAKE",
+		//[CLASS_LABEL_DOUBLE_THUMB]   = "DOUBLE THUMB",
+		//[CLASS_LABEL_ROTATION_RIGHT] = "ROTATION RIGHT",
+		//[CLASS_LABEL_ROTATION_LEFT]  = "ROTATION LEFT"
+		[CLASS_LABEL_SWIPE_DOWN]     = "SWIPE DOWN",		
 	};
 
 	static const uint8_t LABELS_CNT = ARRAY_SIZE(LABEL_VS_NAME);
@@ -61,12 +63,14 @@ static const class_prediction_condition_t *get_class_condition(uint8_t predicted
 	static const class_prediction_condition_t LABEL_VS_CONFIG[] = {
 		[CLASS_LABEL_IDLE]           = {0, 0.0},
 		[CLASS_LABEL_UNKNOWN]        = {0, 0.0},
-		[CLASS_LABEL_SWIPE_LEFT]     = {2, 0.8},
-		[CLASS_LABEL_SWIPE_RIGHT]    = {2, 0.8},
-		[CLASS_LABEL_DOUBLE_SHAKE]   = {2, 0.7},
-		[CLASS_LABEL_DOUBLE_THUMB]   = {3, 0.7},
-		[CLASS_LABEL_ROTATION_RIGHT] = {2, 0.7},
-		[CLASS_LABEL_ROTATION_LEFT]  = {2, 0.7},
+		[CLASS_LABEL_SWIPE_UP]		 = {1, 0.8},
+		[CLASS_LABEL_SWIPE_LEFT]     = {1, 0.8},
+		[CLASS_LABEL_SWIPE_RIGHT]    = {1, 0.8},
+		//[CLASS_LABEL_DOUBLE_SHAKE]   = {2, 0.7},
+		//[CLASS_LABEL_DOUBLE_THUMB]   = {3, 0.9},
+		//[CLASS_LABEL_ROTATION_RIGHT] = {2, 0.7},
+		//[CLASS_LABEL_ROTATION_LEFT]  = {2, 0.7},
+		[CLASS_LABEL_SWIPE_DOWN]	 ={1, 0.8},
 	};
 
 	static const uint8_t LABELS_CNT = ARRAY_SIZE(LABEL_VS_CONFIG);
@@ -117,12 +121,12 @@ static float average_probability(const prediction_tracer_t *tracer)
 
 	return average_prob / tracer->index;
 }
-
+/*
 static bool is_repetitive_class(uint16_t target)
 {
 	return (target == CLASS_LABEL_ROTATION_RIGHT) ||
 	       (target == CLASS_LABEL_ROTATION_LEFT);
-}
+}*/
 
 static bool apply_conditions(const class_prediction_condition_t *condition,
 			      const prediction_tracer_t *tracer,
@@ -176,8 +180,11 @@ prediction_ctx_t inference_postprocess(uint16_t target, float probability)
 
 		bool evaluated = apply_conditions(class_condition, &tracer, &target, &probability);
 
-		/* Reset tracer index for non-repetitive classes */
-		if (evaluated && !is_repetitive_class(target)) {
+		/* All active classes are one-shot swipes (no repetitive/continuous
+		 * class like the unused ROTATION_* labels), so any evaluated
+		 * prediction resets the tracer to require fresh evidence before
+		 * firing again. */
+		if (evaluated) {
 			tracer.index = 0;
 		}
 	}

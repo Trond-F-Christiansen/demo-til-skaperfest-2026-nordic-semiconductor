@@ -1,4 +1,4 @@
-/* 2026-02-27T08:12:56.624677 */
+/* 2026-07-23T06:28:47.029018 */
 /*
 * Copyright (c) 2026 Nordic Semiconductor ASA
 * SPDX-License-Identifier: Apache-2.0
@@ -7,10 +7,11 @@
 #include "nrf_edgeai_user_types.h"
 #include <nrf_edgeai/nrf_edgeai_platform.h>
 #include <nrf_edgeai/rt/private/nrf_edgeai_interfaces.h>
+#include <assert.h>
 
 //////////////////////////////////////////////////////////////////////////////
 /* Nordic EdgeAI Lab Solution ID and Runtime Version */
-#define EDGEAI_LAB_SOLUTION_ID_STR      "36038"
+#define EDGEAI_LAB_SOLUTION_ID_STR      "94854"
 #define EDGEAI_RUNTIME_VERSION_COMBINED 0x00000202
 
 //////////////////////////////////////////////////////////////////////////////
@@ -28,10 +29,10 @@
 /** Number of input feature samples that should be collected in the input window
  *  feature_sample = 1 * INPUT_UNIQ_FEATURES_NUM
  */
-#define INPUT_WINDOW_SIZE                  99
+#define INPUT_WINDOW_SIZE                  64
 
 /** Number of input feature samples on that the input window is shifted */
-#define INPUT_WINDOW_SHIFT                 33
+#define INPUT_WINDOW_SHIFT                 20
 
 /** Number of subwindows in input feature window,
 * the SUBWINDOW_SIZE = INPUT_WINDOW_SIZE / INPUT_SUBWINDOW_NUM
@@ -44,13 +45,13 @@
 /** Defines input(also used for LAG) features MIN scaling factor
  */
 static const nrf_user_input_t INPUT_FEATURES_SCALE_MIN[] = {
- -32748.0000000, -32730.0000000, -32765.0000000, -17453.0000000,
+ -32722.0000000, -32753.0000000, -32761.0000000, -17453.0000000,
  -17453.0000000, -17453.0000000 };
 
 /** Defines input(also used for LAG) features MAX scaling factor
  */
 static const nrf_user_input_t INPUT_FEATURES_SCALE_MAX[] = {
- 32754.0000000, 32726.0000000, 32765.0000000, 16426.0000000, 17453.0000000,
+ 32749.0000000, 32742.0000000, 32765.0000000, 17453.0000000, 17453.0000000,
  17453.0000000 };
 
 /** Defines which unique features from the input data will be used/collected,
@@ -66,7 +67,7 @@ static const nrf_user_input_t INPUT_FEATURES_SCALE_MAX[] = {
 //////////////////////////////////////////////////////////////////////////////
 #define MODEL_TYPE                 __NRF_EDGEAI_MODEL_AXON
 #define MODEL_TASK                 0
-#define MODEL_OUTPUTS_NUM          8
+#define MODEL_OUTPUTS_NUM          6
 
 #define MODEL_USES_AS_INPUT_INPUT_FEATURES 0
 #define MODEL_USES_AS_INPUT_DSP_FEATURES 1
@@ -76,7 +77,7 @@ static const nrf_user_input_t INPUT_FEATURES_SCALE_MAX[] = {
 #include <drivers/axon/nrf_axon_nn_infer.h>  
 #include <axon/nrf_axon_platform.h> 
 #include "nrf_edgeai_user_model_axon.h" 
-#define P_MODEL_INSTANCE &model_axon_user_instance_36038
+#define P_MODEL_INSTANCE &model_axon_user_instance_94854
 #else  // MODEL_TYPE == __NRF_EDGEAI_MODEL_NEUTON
 #define P_MODEL_INSTANCE &model_neuton_user_instance_ 
 #endif
@@ -108,7 +109,7 @@ static nrf_edgeai_window_ctx_t input_window_ctx_;
 
 //////////////////////////////////////////////////////////////////////////////
 /** The maximum number of extracted features that user used for all unique input features */
-#define EXTRACTED_FEATURES_NUM  96
+#define EXTRACTED_FEATURES_NUM  84
 
 #define EXTRACTED_FEATURES_META_TYPE f32 
 
@@ -127,59 +128,55 @@ static nrf_edgeai_window_ctx_t input_window_ctx_;
  */
 
 static const uint64_t FEATURES_EXTRACTION_MASK[] = {
- 0x5fc79b00000000, 0x5fc79b00000000, 0x5fc79b00000000, 0x5fc79b00000000,
- 0x5fc79b00000000, 0x5fc79b00000000 };
+ 0xc0c41ff00000000, 0xc0c41ff00000000, 0xc0c41ff00000000,
+ 0xc0c41ff00000000, 0xc0c41ff00000000, 0xc0c41ff00000000 };
 
 /** Defines arguments used while feature extraction
  */
 
 /** Defines arguments used while feature extraction
  */
-static const nrf_user_input_t FEATURES_EXTRACTION_ARGUMENTS[] =
-{ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+#define FEATURES_EXTRACTION_ARGUMENTS NULL
 
 /** Defines extracted features MIN scaling factor
  */
 static const nrf_user_feature_t EXTRACTED_FEATURES_SCALE_MIN[] = {
- -32748.0000000, -7267.0000000, -9425.1816406, 40.9948006, 47.1917114,
- 70.2703323, 0.0102041, 0.0000000, 59.6161613, 20.6530609, 0.0000000,
- 0.0000000, 0.0000000, 0.1212121, 0.0000000, 255.6501465, -32730.0000000,
- -7666.0000000, -13897.9794922, 29.5414734, 35.4567223, 49.7439919,
- 0.0102041, 0.0000000, 40.9494934, 18.1530609, 0.0000000, 0.0000000,
- 0.0000000, 0.1717172, 0.0000000, 235.5228271, -32765.0000000,
- -284.0000000, -7485.1718750, 47.0745850, 61.5536728, 529.1563110,
- 0.0102041, 0.0000000, 434.9090881, 27.3775501, 0.0000000, 0.0000000,
- 0.0000000, 0.1313131, 0.0000000, 343.0218506, -17453.0000000, 10.0000000,
- -2865.6667480, 4.9696970, 6.3197622, 7.3663173, 0.0102041, 0.0000000,
- 5.4949493, 2.1734693, 0.0000000, 0.0000000, 0.0101010, 0.1414141,
- 0.0000000, 27.4043789, -17453.0000000, -3494.0000000, -8439.6367188,
- 4.4832158, 5.9640450, 6.1627750, 0.0102041, 0.0000000, 4.4646463,
- 2.8265307, 0.0000000, 0.0000000, 0.0000000, 0.1616162, 0.0000000,
- 35.5949440, -17453.0000000, -483.0000000, -4905.6567383, 5.8536901,
- 7.6901665, 7.8380065, 0.0102041, 0.0000000, 5.9191918, 3.0612245,
- 0.0000000, 0.0000000, 0.0000000, 0.1313131, 0.0000000, 39.7114601 };
+ -32722.0000000, -9584.0000000, 33.0000000, -12701.9375000, 6.1103516,
+ -4.2995367, -1.7116241, 7.5404506, 86.0475922, 65.4062500, 0.0000000,
+ 0.1718750, -733.4035645, -23198.5468750, -32753.0000000, -8188.0000000,
+ 28.0000000, -13534.3593750, 4.3369141, -2.6653280, -1.6922656, 5.6854177,
+ 6.2687221, 4.6093750, 0.0000000, 0.2656250, -393.2038574, -15960.5957031,
+ -32761.0000000, -9547.0000000, 30.0000000, -11300.6562500, 6.2416992,
+ -4.5786304, -1.5896641, 7.7110758, 77.5651932, 76.5468750, 0.0000000,
+ 0.2031250, -495.1842346, -21378.5644531, -17453.0000000, -1633.0000000,
+ 2.0000000, -5042.2031250, 0.2812500, -2.7833576, -1.7203130, 0.5303301,
+ 0.5448624, 0.2968750, 0.0000000, 0.1250000, -285.6880188, -8899.2568359,
+ -17453.0000000, -2996.0000000, 2.0000000, -4870.4687500, 0.3999023,
+ -2.8084927, -1.6134994, 0.5986639, 2.0000000, 1.7187500, 0.0000000,
+ 0.1406250, -313.5538940, -12205.1621094, -17453.0000000, -2928.0000000,
+ 2.0000000, -6351.9375000, 0.4711914, -3.1293778, -1.7719443, 0.5555121,
+ 1.7544585, 1.3593750, 0.0000000, 0.1406250, -426.2028809, -13650.6171875 };
 
 /** Defines extracted features MAX scaling factor
  */
 static const nrf_user_feature_t EXTRACTED_FEATURES_SCALE_MAX[] = {
- 4885.0000000, 32754.0000000, 11374.7773438, 15412.7685547, 18479.0859375,
- 19096.8144531, 0.3265306, 0.3061225, 16738.8691406, 8404.6328125,
- 0.1734694, 0.1734694, 1.0000000, 0.8383839, 0.3131313, 171357.0937500,
- 6514.0000000, 32726.0000000, 9336.1513672, 23603.1230469, 24653.2363281,
- 24755.1835938, 0.3775510, 0.3775510, 23726.2929688, 18015.8984375,
- 0.2346939, 0.2346939, 1.0000000, 0.8585858, 0.3232323, 271293.2812500,
- 9803.0000000, 32765.0000000, 13463.3330078, 18790.7519531, 21102.3886719,
- 21262.4101562, 0.3877551, 0.3061225, 18878.5957031, 14207.1630859,
- 0.2448980, 0.2448980, 1.0000000, 0.8787879, 0.2828283, 228357.3437500,
- 597.0000000, 16426.0000000, 6722.4443359, 7007.6567383, 8455.8876953,
- 8931.9335938, 0.2448980, 0.2551020, 8321.4951172, 1701.4693604, 0.1632653,
- 0.1632653, 1.0000000, 0.9090909, 0.3232323, 31512.7421875, 407.0000000,
- 17453.0000000, 3480.9494629, 10450.7490234, 11906.0722656, 11949.7958984,
- 0.3469388, 0.3469388, 10639.8994141, 3293.6735840, 0.2448980, 0.2448980,
- 1.0000000, 0.8888889, 0.3030303, 47526.9023438, 544.0000000,
- 17453.0000000, 3967.0808105, 10020.2080078, 11040.5839844, 11054.3789062,
- 0.2551020, 0.2551020, 10048.0908203, 4000.2448730, 0.1734694, 0.1734694,
- 1.0000000, 0.8686869, 0.3131313, 47814.7812500 };
+ 9608.0000000, 32749.0000000, 65286.0000000, 12444.8125000, 21262.7089844,
+ 5.6916914, 40.2269936, 23110.5429688, 23134.1210938, 21256.0156250,
+ 1.0000000, 0.8906250, 671.3605957, 24636.2753906, 6836.0000000,
+ 32742.0000000, 64769.0000000, 10860.3437500, 17902.7343750, 4.7186847,
+ 29.1099358, 20819.5878906, 21520.2519531, 19797.7812500, 1.0000000,
+ 0.8593750, 364.9482117, 19097.3769531, 9771.0000000, 32765.0000000,
+ 65331.0000000, 12868.4218750, 19096.9062500, 4.9062943, 30.1005707,
+ 21522.9160156, 22415.1933594, 20690.4062500, 1.0000000, 0.8906250,
+ 530.3873901, 19805.3808594, 2112.0000000, 17453.0000000, 33654.0000000,
+ 6660.8906250, 9464.5869141, 3.2546761, 10.2784872, 10601.2968750,
+ 10601.5097656, 9468.7968750, 1.0000000, 0.8593750, 257.2485657,
+ 11170.3759766, 1452.0000000, 17453.0000000, 34906.0000000, 5248.1562500,
+ 12245.0556641, 4.2169304, 18.6561680, 13737.7246094, 13854.4873047,
+ 12557.7031250, 1.0000000, 0.8281250, 345.7720032, 13584.8222656,
+ 3236.0000000, 17453.0000000, 34906.0000000, 6515.1250000, 12424.2617188,
+ 2.7100842, 12.7044811, 13570.3808594, 13571.5000000, 12412.8750000,
+ 1.0000000, 0.8593750, 376.3094177, 15591.2587891 };
 
 /** Memory allocation to store extracted features during DSP pipeline */
 static uint8_t extracted_features_buffer_[EXTRACTED_FEATURES_BUFFER_SIZE_BYTES] __NRF_EDGEAI_ALIGNED;
@@ -193,18 +190,13 @@ static const nrf_edgeai_features_pipeline_func_f32_t timedomain_features_[] = {
     nrf_edgeai_feature_min_max_range_f32,
     nrf_edgeai_feature_mean_f32,
     nrf_edgeai_feature_mad_f32,
+    nrf_edgeai_feature_skew_kur_f32,
     nrf_edgeai_feature_std_f32,
     nrf_edgeai_feature_rms_f32,
-    nrf_edgeai_feature_mcr_f32,
-    nrf_edgeai_feature_zcr_f32,
     nrf_edgeai_feature_absmean_f32,
-    nrf_edgeai_feature_amdf_f32,
-    nrf_edgeai_feature_pscr_f32,
-    nrf_edgeai_feature_nscr_f32,
     nrf_edgeai_feature_psoz_f32,
     nrf_edgeai_feature_psom_f32,
-    nrf_edgeai_feature_psos_f32,
-    nrf_edgeai_feature_rmds_f32
+    nrf_edgeai_feature_lrp_f32
  };
 
 static const nrf_edgeai_features_pipeline_ctx_t timedomain_pipeline_ = {
@@ -299,34 +291,49 @@ static nrf_edgeai_t nrf_edgeai_ = {
 
 //////////////////////////////////////////////////////////////////////////////
 
-nrf_edgeai_t* nrf_edgeai_user_model_36038(void)
+nrf_edgeai_t* nrf_edgeai_user_model_94854(void)
 {
     return &nrf_edgeai_;
 }
 
 //////////////////////////////////////////////////////////////////////////////
 
-uint32_t nrf_edgeai_user_model_neuton_size_36038(void)
+uint32_t nrf_edgeai_user_model_size_94854(void)
 {
-    uint32_t model_meta_size = 0;
+    uint32_t model_size = 0;
+
 #if MODEL_TYPE == __NRF_EDGEAI_MODEL_NEUTON
-    model_meta_size +=
+    model_size +=
         (sizeof(MODEL_WEIGHTS) + sizeof(MODEL_NEURONS_LINKS) +
          sizeof(MODEL_NEURON_EXTERNAL_LINKS_NUM) + sizeof(MODEL_NEURON_INTERNAL_LINKS_NUM) +
          sizeof(MODEL_NEURON_ACTIVATION_WEIGHTS) + sizeof(MODEL_NEURON_ACTIVATION_TYPE_MASK) +
          sizeof(MODEL_OUTPUT_NEURONS_INDICES));
-#endif
 
 #if MODEL_TASK == __NRF_EDGEAI_TASK_ANOMALY_DETECTION
-    model_meta_size += sizeof(MODEL_AVERAGE_EMBEDDING) + sizeof(MODEL_OUTPUT_SCALE_MIN) +
-                       sizeof(MODEL_OUTPUT_SCALE_MAX);
+    model_size += sizeof(MODEL_AVERAGE_EMBEDDING) + sizeof(MODEL_OUTPUT_SCALE_MIN) +
+                  sizeof(MODEL_OUTPUT_SCALE_MAX);
 #endif
 
 #if MODEL_TASK == __NRF_EDGEAI_TASK_REGRESSION
-    model_meta_size += sizeof(MODEL_OUTPUT_SCALE_MIN) + sizeof(MODEL_OUTPUT_SCALE_MAX);
+    model_size += sizeof(MODEL_OUTPUT_SCALE_MIN) + sizeof(MODEL_OUTPUT_SCALE_MAX);
 #endif
 
-    return model_meta_size;
+#elif MODEL_TYPE == __NRF_EDGEAI_MODEL_AXON
+    const nrf_axon_nn_compiled_model_s* p_axon_model = P_MODEL_INSTANCE;
+
+    model_size += sizeof(*p_axon_model);
+    model_size += p_axon_model->model_const_size;
+    model_size += p_axon_model->cmd_buffer_len * sizeof(NRF_AXON_PLATFORM_BITWIDTH_UNSIGNED_TYPE);
+
+    if (p_axon_model->persistent_vars.buf_ptr != NULL)
+    {
+        model_size +=
+            sizeof(nrf_axon_nn_model_persistent_var_s) * p_axon_model->persistent_vars.count;
+    }
+
+#endif
+
+    return model_size;
 }
 
 

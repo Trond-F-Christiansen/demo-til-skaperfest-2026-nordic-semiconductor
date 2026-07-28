@@ -19,6 +19,7 @@ from __future__ import annotations
 import queue
 import re
 import threading
+import time
 
 try:
     import serial  # pyserial
@@ -39,6 +40,22 @@ DIRECTIONS = {
 
 _KEYWORD_RE = re.compile(r"Command:\s*(\w+)")
 
+# Lines that only game_receiver's firmware ever prints, used to tell its
+# console apart from another DK's console when both are plugged in at once
+# (see _probe_is_receiver()). Deliberately narrow: e.g. "Bluetooth
+# initialized" is NOT here because game_controller logs that exact line too
+# (ble_nus.c), which caused a false-positive match on the wrong board.
+_RECEIVER_SIGNATURE_RE = re.compile(
+    r"Command:|Scanning for a game controller"
+)
+
+# J-Link serial number of the DK that's actually running game_receiver.
+# Checked before anything else, since it's deterministic (unlike probing,
+# which needs the board to log something during the probe window). Update
+# this if game_receiver ever gets flashed onto a different physical DK; get
+# the serial with `nrfjprog --ids` or `nrfutil device list`.
+_KNOWN_RECEIVER_SERIAL = "001051849885"
+
 # USB vendor IDs of the debug probes used on Nordic DKs (SEGGER J-Link OB,
 # Nordic Semiconductor), used to pick out candidate ports.
 _KNOWN_VIDS = {0x1366, 0x1915}
@@ -48,6 +65,10 @@ _KNOWN_VIDS = {0x1366, 0x1915}
 # stable across reboots and replugs, unlike the /dev/ttyACMx ordering, so we
 # select on the interface rather than probing traffic.
 _CONSOLE_USB_INTERFACE = 2
+
+# How long to listen to a candidate port for its signature before giving up
+# and falling back to the next one, in seconds.
+_PROBE_TIMEOUT_S = 2.0
 
 
 def list_candidate_ports() -> list[str]:
@@ -72,21 +93,80 @@ def list_candidate_ports() -> list[str]:
     return [p.device for p in ranked if score(p) > 0]
 
 
-def find_controller_port() -> str | None:
+def _probe_is_receiver(port: str, baudrate: int, timeout: float, result: dict) -> None:
+    """Listen briefly on `port` for a line only game_receiver's firmware prints."""
+    try:
+        with serial.Serial(port, baudrate, timeout=0.2) as ser:
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                line = ser.readline().decode("utf-8", errors="replace")
+                if _RECEIVER_SIGNATURE_RE.search(line):
+                    result[port] = True
+                    return
+    except (serial.SerialException, OSError):
+        pass
+    result[port] = False
+
+
+def _pick_receiver_port(candidates: list[str], baudrate: int) -> str | None:
+    """Probe all tied candidates at once; one swipe during the window is enough
+    to identify the right one regardless of ttyACMx ordering."""
+    result: dict[str, bool] = {}
+    threads = [
+        threading.Thread(target=_probe_is_receiver, args=(port, baudrate, _PROBE_TIMEOUT_S, result))
+        for port in candidates
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    for port in candidates:
+        if result.get(port):
+            return port
+    return None
+
+
+def find_controller_port(baudrate: int = 115200) -> str | None:
     """Return the firmware console port, selected by stable USB interface.
 
     The J-Link's console VCOM is always at USB interface @ref
     _CONSOLE_USB_INTERFACE, regardless of how Linux numbers the ttyACMx
-    devices. Falls back to the highest-ranked candidate if that interface
-    cannot be identified (e.g. a board that does not report a location).
+    devices. If @ref _KNOWN_RECEIVER_SERIAL is plugged in, its port wins
+    immediately. Otherwise, if more than one board's console matches (e.g. a
+    second DK is plugged in for testing another app), each tied candidate is
+    probed briefly and the one actually printing game_receiver's log lines
+    wins. Falls back to the highest-ranked candidate if the interface cannot
+    be identified (e.g. a board that does not report a location).
 
     @return Device path, or None if no candidate ports were found.
     """
     # location looks like '5-1:1.2'; the trailing '.N' is the USB interface.
     suffix = f":1.{_CONSOLE_USB_INTERFACE}"
-    for p in list_ports.comports():
-        if p.vid in _KNOWN_VIDS and p.location and p.location.endswith(suffix):
+    ports = [
+        p
+        for p in list_ports.comports()
+        if p.vid in _KNOWN_VIDS and p.location and p.location.endswith(suffix)
+    ]
+
+    for p in ports:
+        if p.serial_number == _KNOWN_RECEIVER_SERIAL:
             return p.device
+
+    tied = [p.device for p in ports]
+
+    if len(tied) == 1:
+        return tied[0]
+    if len(tied) > 1:
+        picked = _pick_receiver_port(tied, baudrate)
+        if picked is not None:
+            return picked
+        print(
+            f"[controller] warning: {len(tied)} candidate ports {tied} but none "
+            "printed a recognizable game_receiver line within "
+            f"{_PROBE_TIMEOUT_S}s; defaulting to {tied[0]}. Pass a port "
+            "explicitly if that's wrong."
+        )
+        return tied[0]
 
     candidates = list_candidate_ports()
     return candidates[0] if candidates else None
@@ -107,7 +187,7 @@ class SerialController:
     def start(self) -> None:
         """Open the port (auto-detecting if needed) and read in a daemon thread."""
         if self.port is None:
-            self.port = find_controller_port()
+            self.port = find_controller_port(self.baudrate)
             if self.port is None:
                 raise RuntimeError(
                     "No DK serial port found. Connect the board, or pass a port "
