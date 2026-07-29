@@ -26,6 +26,8 @@ import pygame
 
 import quiz
 import snake
+import minesweeper
+
 from controller import SerialController
 
 # Window matches snake's 25 x 40px grid. New games should draw within this.
@@ -52,7 +54,7 @@ class Game:
 GAMES = [
     Game("Snake", snake.run),
     Game("Quiz", quiz.run),
-    # Game("Tetris", tetris.run),
+    Game("Minesweeper", minesweeper.run),
 ]
 
 
