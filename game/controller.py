@@ -292,8 +292,8 @@ if __name__ == "__main__":
     # Reverse map so we can print a readable name, not just the (dx, dy) tuple.
     NAMES = {v: k for k, v in DIRECTIONS.items()}
 
-    #controller = SerialController(port, baud)
-    controller = SerialController(port='/dev/ttyACM3', baudrate=115200)
+    controller = SerialController(port, baud)
+    #controller = SerialController(port='/dev/ttyACM1', baudrate=115200)
     controller.start()
     print(f"Listening on {controller.port} @ {baud} (Ctrl-C to stop)...")
     try:

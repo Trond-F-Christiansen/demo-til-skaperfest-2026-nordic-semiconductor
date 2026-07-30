@@ -41,7 +41,6 @@ HILITE_BG = "#003C66"
 FONT_PATH = 'Font/PoetsenOne-Regular.ttf'
 FONT_PATH_HELVETICA = "Font/Helvetica.ttf"
 
-
 class Game:
     """A menu-selectable game: a display name and its run() entry point."""
 

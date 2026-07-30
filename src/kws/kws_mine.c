@@ -61,11 +61,11 @@ static const struct mine_detection_ctx mine_ctxs[] = {
 	[MINE_FOUR]    = {.name = "four",    .token = "FOUR\r\n",  .threshold = 0.3f,  .num_in_row = 5},
 	[MINE_NO]      = {.name = "no",      .token = "NO\r\n",    .threshold = 0.3f,  .num_in_row = 5},
 	[MINE_ONE]     = {.name = "one",     .token = "ONE\r\n",   .threshold = 0.3f,  .num_in_row = 5},
-	[MINE_OPEN]    = {.name = "open",    .token = "OPEN\r\n",  .threshold = 0.3f,  .num_in_row = 5},
+	[MINE_OPEN]    = {.name = "open",    .token = "OPEN\r\n",  .threshold = 0.2f,  .num_in_row = 4},
 	[MINE_RESET]   = {.name = "reset",   .token = "RESET\r\n", .threshold = 0.3f,  .num_in_row = 5},
 	[MINE_SEVEN]   = {.name = "seven",   .token = "SEVEN\r\n", .threshold = 0.3f,  .num_in_row = 5},
 	[MINE_SIX]     = {.name = "six",     .token = "SIX\r\n",   .threshold = 0.3f,  .num_in_row = 5},
-	[MINE_THREE]   = {.name = "three",   .token = "THREE\r\n", .threshold = 0.3f,  .num_in_row = 5},
+	[MINE_THREE]   = {.name = "three",   .token = "THREE\r\n", .threshold = 0.2f,  .num_in_row = 4},
 	[MINE_TWO]     = {.name = "two",     .token = "TWO\r\n",   .threshold = 0.3f,  .num_in_row = 5},
 	[MINE_ZERO]    = {.name = "zero",    .token = "ZERO\r\n",  .threshold = 0.3f,  .num_in_row = 5},
 };

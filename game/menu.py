@@ -11,11 +11,12 @@ class Menu:
         self.btn_flags.background = RED1
         self.label_bombs = self.Label(30, 10)
         self.label_game_end = self.Label(30, 10)
-        self.label_flags = self.Label(293, 40)
-        self.label_mode = self.Label(135, 40)
-        self.label_time = self.Label(10,40)
+        self.label_flags = self.Label(250, 45)      
+        self.label_mode = self.Label(120, 45)       
+        self.label_time = self.Label(10, 45)        
         self.label_minesweeper = self.Label(20,5)
         self.label_setup = self.Label(30,40)
+        self.menu_font = pygame.font.Font('freesansbold.ttf', 16) 
 
     def draw(self, screen, font, game, mode):
         self.width = screen.get_width() - 2 * MARGIN
@@ -34,13 +35,12 @@ class Menu:
             #vis tid
             elapsed_time=game.get_elapsed_time()
             if not game.setup_mode:
-                self.label_time.show(screen, font, "Time: " + str(elapsed_time))
-                self.label_flags.show(screen, font, "Mines left: " + str( game.num_bombs-game.flag_count))
-        #vise modus til brukeren
-                if mode=="flag":
-                    self.label_mode.show(screen, font, "Flag-mode")
-                elif mode=="open":
-                    self.label_mode.show(screen, font, "Open-mode")
+                self.label_time.show(screen, self.menu_font, "Time: " + str(elapsed_time))
+                self.label_flags.show(screen, self.menu_font, "Mines: " + str(game.num_bombs - game.flag_count))
+                if mode == "flag":
+                    self.label_mode.show(screen, self.menu_font, "Flag-mode")
+                elif mode == "open":
+                    self.label_mode.show(screen, self.menu_font, "Open-mode")
             else:
                 self.label_setup.show(screen, font, "Place your bombs!")
 

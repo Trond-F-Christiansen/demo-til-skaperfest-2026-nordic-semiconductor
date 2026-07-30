@@ -88,6 +88,52 @@ def handle_voice_input(game, state, controller):
             state["row"] = None
             state["column"] = None
         
+def draw_info(screen, win_h):
+    """Tegn en hjelpetekst i en boks til venstre for brettet."""
+    title_font = pygame.font.Font('freesansbold.ttf', 26)
+    text_font = pygame.font.Font('freesansbold.ttf', 18)
+
+    lines = [
+        ("Stemmestyring", True),
+        ("", False),
+        ("Si tall (rad og", False),
+        ("kolonne) for å", False),
+        ("velge en rute.", False),
+        ("", False),
+        ("'open' åpner ruten", False),
+        ("du har valgt.", False),
+        ("", False),
+        ("'flag' setter et", False),
+        ("flagg der du tror", False),
+        ("det er en mine.", False),
+        ("", False),
+        ("'no' angrer hvis", False),
+        ("du sa feil tall.", False),
+    ]
+
+    # Boks-dimensjoner
+    box_x = 15
+    box_y = 90
+    box_w = 250
+    box_h = 470
+
+    # Bakgrunn + ramme
+    box = pygame.Rect(box_x, box_y, box_w, box_h)
+    pygame.draw.rect(screen, (200, 195, 210), box, border_radius=12)
+    pygame.draw.rect(screen, (80, 40, 40), box, 3, border_radius=12)
+
+    # Tekst
+    x = box_x + 18
+    y = box_y + 20
+    for text, is_title in lines:
+        if text == "":
+            y += 14
+            continue
+        f = title_font if is_title else text_font
+        color = (180, 60, 60) if is_title else (40, 40, 40)
+        surf = f.render(text, True, color)
+        screen.blit(surf, (x, y))
+        y += f.get_height() + 6
 
 def main(controller, screen):
     best_seconds = 0
@@ -96,9 +142,12 @@ def main(controller, screen):
                   NSQUARES * (HEIGHT + MARGIN) + MARGIN + MENU_SIZE + LABEL_SIZE)
     board_surf = pygame.Surface(board_size)
     win_w, win_h = screen.get_size()
-    scale = min(win_w / board_size[0], win_h / board_size[1]) * 0.9
+    info_width = 280                                   # plass til infoboks til venstre
+    avail_w = win_w - info_width
+    scale = min(avail_w / board_size[0], win_h / board_size[1]) * 0.9
     scaled_size = (int(board_size[0] * scale), int(board_size[1] * scale))
-    offset_x = (win_w - scaled_size[0]) // 2
+    # sentrer brettet i omradet TIL HOYRE for infoboksen
+    offset_x = info_width + (avail_w - scaled_size[0]) // 2
     offset_y = (win_h - scaled_size[1]) // 2
 
     font = pygame.font.Font('freesansbold.ttf', 24)
@@ -145,6 +194,7 @@ def main(controller, screen):
                     #game.start_time = pygame.time.get_ticks()
 
         screen.fill(GREEN1)
+        draw_info(screen, win_h)                      # ← infoboks til venstre
         game.draw(board_surf, font, state)
         handle_voice_input(game, state, controller)
 
