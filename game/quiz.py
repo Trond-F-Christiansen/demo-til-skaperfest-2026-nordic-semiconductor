@@ -185,4 +185,6 @@ def run(screen, clock, controller):
             return None
         if choice == question.answer:
             score += 1
+    controller.send_score("quiz", score)
     return score
+

@@ -37,7 +37,18 @@ DIRECTIONS = {
     "LEFT": (-1, 0),
     "RIGHT": (1, 0),
 }
+#for minesweeper
+KEYWORDS = {
+    "ZERO": 0, "ONE": 1, "TWO": 2, "THREE": 3,
+    "FOUR": 4, "FIVE": 5, "SIX": 6, "SEVEN": 7,
+}
 
+COMMANDS = {
+    "RESET": "reset",
+    "FLAG": "flag",
+    "OPEN": "open",
+    "NO": "no",
+}
 _KEYWORD_RE = re.compile(r"Command:\s*(\w+)")
 
 # Lines that only game_receiver's firmware ever prints, used to tell its
@@ -180,6 +191,7 @@ class SerialController:
         self.port = port
         self.baudrate = baudrate
         self.directions: "queue.Queue[tuple[int, int]]" = queue.Queue()
+        self.commands: "queue.Queue[tuple[str, object]]" = queue.Queue() #minesweeper-commands
         self._serial: serial.Serial | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -241,9 +253,35 @@ class SerialController:
             match = _KEYWORD_RE.search(line)
             if not match:
                 continue
-            direction = DIRECTIONS.get(match.group(1))
+            word = match.group(1)   
+
+            # 1) Retning (Snake/Quiz)
+            direction = DIRECTIONS.get(word)
             if direction is not None:
                 self.directions.put(direction)
+                continue
+
+            # 2) Tall (Minesweeper)
+            if word in KEYWORDS:
+                self.commands.put(("number", KEYWORDS[word]))
+                continue
+
+            # 3) Kommando (Minesweeper)
+            if word in COMMANDS:
+                self.commands.put(("command", COMMANDS[word]))
+                continue
+
+    def get_command(self, max_square: int | None = None):
+    #returnerer samme format som minesweeper forventer
+        try:
+            kind, value = self.commands.get_nowait()
+        except queue.Empty:
+            return None
+
+        if kind == "number" and max_square is not None and value >= max_square:
+            return None  #vil ikke ha tall utafor brettet
+
+        return (kind, value)
 
 if __name__ == "__main__":
     import sys

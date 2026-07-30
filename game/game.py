@@ -2,7 +2,6 @@
 
 from random import randrange
 import pygame
-from cloud_sender import send_score
 
 from config import (
     WIDTH, HEIGHT, NSQUARES, MARGIN, MENU_SIZE,
@@ -169,17 +168,10 @@ class Game:
             for column in range(self.squares_x):
                 if self.grid[row][column].is_visible:
                     count += 1
-        #HER MÅ VI SENDE SCORE
+
         if ((total - count) == self.num_bombs) and not self.game_lost:
             self.game_won = True
             self.end_time=pygame.time.get_ticks()
-
-            send_score(
-                        player_name = self.player_name,
-                        mines_found=self.num_bombs,
-                        time_seconds=self.get_elapsed_time(),
-                        won=True
-                    )
 
             for row in range(self.squares_y):
                 for column in range(self.squares_x):
@@ -211,14 +203,9 @@ class Game:
                 self.grid[row][column].has_flag = False
                 if self.grid[row][column].has_bomb:
                     self.game_over()
-                    self.game_lost = True #HER MÅ VI SENDE SCORE (?)
+                    self.game_lost = True 
                     self.end_time = pygame.time.get_ticks()
-                    send_score(
-                        player_name = self.player_name,
-                        mines_found=self.num_bombs,
-                        time_seconds=self.get_elapsed_time(),
-                        won=False
-                    )
+        
                 if (self.grid[row][column].bomb_count == 0
                         and not self.grid[row][column].has_bomb):
                     self.grid[row][column].open_neighbours(

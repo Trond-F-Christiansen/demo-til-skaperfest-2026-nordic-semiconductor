@@ -12,25 +12,18 @@ import minesweeper_game
 
 
 def run(screen, clock, controller):
-    # 1. Free the serial port for Minesweeper's own serial_input.
-    controller.stop()
 
-    # 2. Remember the menu's window size so we can restore it later.
+    # siden minesweeper har forskjellig størrelse må vi huske størrelsen- dette endrer jeg på en senere tidspunkt.
     menu_size = screen.get_size()
-
+    seconds = 0
     try:
-        minesweeper_game.main()   # Minesweeper's existing loop
+        result=minesweeper_game.main(controller, screen) 
+        if result is not None:
+            seconds = result
     except SystemExit:
-        # main() calls sys.exit() when the window is closed; swallow it
-        # so the whole app doesn't quit.
         pass
     finally:
-        # 3. Restore the menu window and restart the shared controller.
         pygame.display.set_mode(menu_size)
-        try:
-            controller.start()
-        except RuntimeError:
-            pass
+    
 
-    # Minesweeper doesn't report a score to the menu; return 0 for now.
-    return 0
+    return seconds

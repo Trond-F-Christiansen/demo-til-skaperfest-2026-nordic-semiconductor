@@ -176,10 +176,8 @@ class MAIN:
         return len(self.snake.body) - 3
 
     def game_over(self):
-        # Signal the run() loop to stop; it returns the score to main.py, which
-        # owns the window/controller and shows the game-over menu.
         score = len(self.snake.body) - 3
-        self.controller.send_score("snake", score, {"won": False})
+        self.controller.send_score("snake", score)
         self.alive = False
 
     def draw_grass(self):

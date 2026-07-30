@@ -3,15 +3,15 @@ import time
 import pygame
 
 from config import (
-    WIDTH, HEIGHT, LABEL_SIZE, NSQUARES, MARGIN, MENU_SIZE, LEFT_CLICK, RIGHT_CLICK, DIFFICULTIES
+    WIDTH, HEIGHT, LABEL_SIZE, NSQUARES, MARGIN, MENU_SIZE, LEFT_CLICK, RIGHT_CLICK, DIFFICULTIES, GREEN1
 )
 from game import Game
 from menu import Menu
-from serial_input import check_wakeword, check_input, clear_buffer
 
 
-def handle_voice_input(game, state):
-    keyword = check_input()
+
+def handle_voice_input(game, state, controller):
+    keyword = controller.get_command(max_square=NSQUARES)
     if keyword is None:
         return
     kind, result = keyword 
@@ -88,24 +88,24 @@ def handle_voice_input(game, state):
             state["row"] = None
             state["column"] = None
         
-    #venter litt, slik at man ikke leser samme ord flere ganger
-    clear_buffer()
-    time.sleep(0.6)
-    clear_buffer()
 
-
-def main():
-    pygame.init()
+def main(controller, screen):
+    best_seconds = 0
     
-    size = (NSQUARES * (WIDTH + MARGIN) + MARGIN + LABEL_SIZE,
-                NSQUARES * (HEIGHT + MARGIN) + MARGIN + MENU_SIZE + LABEL_SIZE)
-    screen = pygame.display.set_mode(size, pygame.RESIZABLE)
-    pygame.display.set_caption("Minesweeper")
+    board_size = (NSQUARES * (WIDTH + MARGIN) + MARGIN + LABEL_SIZE,
+                  NSQUARES * (HEIGHT + MARGIN) + MARGIN + MENU_SIZE + LABEL_SIZE)
+    board_surf = pygame.Surface(board_size)
+    win_w, win_h = screen.get_size()
+    scale = min(win_w / board_size[0], win_h / board_size[1]) * 0.9
+    scaled_size = (int(board_size[0] * scale), int(board_size[1] * scale))
+    offset_x = (win_w - scaled_size[0]) // 2
+    offset_y = (win_h - scaled_size[1]) // 2
+
     font = pygame.font.Font('freesansbold.ttf', 24)
 
     game = Game()
     game.player_name="Anonym"
-    menu = Menu(screen)
+    menu = Menu(board_surf)
     clock = pygame.time.Clock()
 
     game_active = True #false før: endrer for å flette med aslak sin kode
@@ -114,13 +114,7 @@ def main():
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return
-            elif event.type == pygame.VIDEORESIZE:
-                if game.resize:
-                    screen = game.adjust_grid(event.w, event.h)
-                    game.reset_game()
-                else:
-                    game.resize = True
+                return best_seconds
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if game.setup_mode:
                     x, y = event.pos
@@ -130,8 +124,11 @@ def main():
                         if c >= 0 and c < game.squares_x:
                             cell = game.grid[r][c]
                             cell.has_bomb = not cell.has_bomb #bombe hvis uten bombe, ikke bombe hvis det er en bombe der allerede
+
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_m:
+                if event.key == pygame.K_ESCAPE:     
+                    return best_seconds
+                elif event.key == pygame.K_m:
                     game.setup_mode=True
                     game.reset_game()
                     print("Oppsett-modus: klikk for å plassere bomber. Trykk mellomrom når du er fornøyd.")
@@ -147,18 +144,25 @@ def main():
                     game.init=True #hopper over utplassering av bomber
                     #game.start_time = pygame.time.get_ticks()
 
+        screen.fill(GREEN1)
+        game.draw(board_surf, font, state)
+        handle_voice_input(game, state, controller)
 
-        if not game_active:
-            if check_wakeword():
-                game_active = True
-        else:
-            game.draw(screen, font, state)
-            handle_voice_input(game, state)
+        if game.game_won or game.game_lost:
+            best_seconds = game.get_elapsed_time()
+            if game.game_won:                                   
+                controller.send_score("minesweeper", best_seconds)
+            game.draw(board_surf, font, state)
+            menu.draw(board_surf, font, game, state["mode"])
+            scaled = pygame.transform.smoothscale(board_surf, scaled_size)
+            screen.blit(scaled, (offset_x, offset_y))
+            pygame.display.flip()
+            pygame.time.delay(1500)
+            return best_seconds
 
-        menu.draw(screen, font, game, state["mode"])
+        menu.draw(board_surf, font, game, state["mode"])
+        scaled = pygame.transform.smoothscale(board_surf, scaled_size)
+        screen.blit(scaled, (offset_x, offset_y))
         clock.tick(60)
         pygame.display.flip()
 
-
-if __name__ == "__main__":
-    run()
