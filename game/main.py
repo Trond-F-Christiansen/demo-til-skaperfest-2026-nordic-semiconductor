@@ -75,12 +75,11 @@ def choose(screen, clock, controller, title, options, subtitle=None):
 
     while True:
         # ---- input --------------------------------------------------------
-        # Controller swipes queued while a menu is up are discarded for now.
-        # This is the ONE place to later map UART directions onto navigation
-        # (e.g. post K_UP/K_DOWN events); menus stay keyboard-driven so that
-        # mapping is all that's needed. Kept keyboard-only on purpose today.
-        while not controller.directions.empty():
-            controller.directions.get()
+        # Controller swipes and finger digits queued while a menu is up are
+        # discarded for now. This is the ONE place to later map UART input onto
+        # navigation (e.g. post K_UP/K_DOWN events); menus stay keyboard-driven
+        # so that mapping is all that's needed. Keyboard-only on purpose today.
+        controller.drain()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:

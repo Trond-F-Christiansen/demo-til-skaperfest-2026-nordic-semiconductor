@@ -6,19 +6,28 @@ the run's score (number of correct answers). main.py then shows the shared
 game-over screen ("Score: N", Restart / Main Menu), so nothing extra is needed
 here for that.
 
+The pot of questions is @ref QUESTIONS below; each run draws @ref
+QUESTIONS_PER_RUN of them at random (no repeats within a run), so consecutive
+plays differ. Grow the pot by adding entries to that list.
+
 Layout: the question prompt is drawn across the top; the answer options are
 stacked top -> down below it. Questions are answered one at a time in order;
 picking an answer advances to the next question. When the last question is
 answered, run() returns the score.
 
-Input is keyboard for now (the planned controller input is a finger counter:
-1-4 fingers -> option 1-4, which maps straight onto the number keys):
-    1 .. N        pick that option and advance
+Input is either the keyboard or the finger counter: the finger_digits board
+sends a settled digit (0-5) over BLE, which is turned into the matching number
+key here, so N fingers picks option N exactly as pressing N would:
+    1 .. 5        pick that option and advance
     UP / DOWN     move the highlight,  ENTER / SPACE pick it
+A held-up hand produces one digit, not a stream: the firmware only reports after
+five identical predictions in a row. Digits with no matching option (0, or a
+count above the option count) are ignored.
 Run indirectly via `python main.py`; the font loads with a path relative to the
 current directory, so run from the game/ folder.
 """
 
+import random
 from collections import namedtuple
 
 import pygame
@@ -30,20 +39,93 @@ BG_COLOR = "#34C3D5"
 TEXT_COLOR = (255, 255, 255)
 HILITE_BG = "#003C66"
 
+# How many of QUESTIONS one run asks: they are drawn at random without repeats,
+# so consecutive runs differ. Raise or lower freely; a value at or above the pot
+# size just asks every question once, in a random order.
+QUESTIONS_PER_RUN = 10
+
 # A single quiz question. `answer` is the 0-based index into `options`.
 Question = namedtuple("Question", "prompt options answer")
 
-# Questions ported from the console draft; the answer index matches the draft's
-# 1-based correct answer (e.g. '4' -> index 3). The draft's 5th prompt (the
-# animal one) wasn't wired in; add it here the same way when you want it.
+# The question pot: add as many as you like here, that is the only change
+# needed. Keep it to 5 options at most -- the finger counter only shows 1-5, so
+# a sixth option could never be picked -- and vary where the correct one sits.
 QUESTIONS = [
-    Question("questions with four answer options?", ["1", "2", "3", "4"], 0),
-    Question("hva er favorittfargen til Selma?", ["rød", "svart", "rosa", "grønn"], 3),
-    Question("hva er favorittfargen til Maria?",["rød", "blå", "rosa", "grønn"], 1),
-    Question("hva er favorittfargen til Nicholas?",["rød", "svart", "rosa", "grønn"], 1),
-    Question("Hva er en NPU?", ["Null Peiling, (U)kis","Nordic Processing Unit","Node Power Unit","Node Processing Unit"], 3),
-    Question("Hva heter den nye statsministeren i Storbritania?", ["Keir Starmer", "John Hopkins","Andy Burnham","Connor Man"], 2)
+    Question("Hvor mange mager har en ku?",
+             ["2", "1", "4", "3", "Ingen, lurespørsmål:P"], 2),
+    Question("Hvilken temperatur viser nøyaktig det samme i både Celsius og Fahrenheit?",
+             ["-40 grader", "0 grader", "32 grader", "-17 grader", "-100 grader"], 0),
+    Question("Hva betyr ordet «idiot» opprinnelig på gresk?",
+             ["en person som ikke kan lese", "en person uten far", "en person som snakker for mye", "en person som er født utenfor byen", "en person som ikke er interessert i politikk"], 4),
+    Question("Hvilket dyr sover med det ene øyet åpent?",
+             ["struts", "delfin", "ugle", "kamel", "flodhest"], 1),
+    Question("Hva er det største dyret som lever på land?",
+             ["neshorn", "giraff", "flodhest", "savanneelefanten", "indisk elefant"], 3),
+    Question("Hva er rosiner laget av?",
+             ["plommer", "tranebær", "fiken", "dadler", "druer"], 4),
+    Question("Hvor mange farger har regnbuen?",
+             ["5", "7", "3", "9", "6"], 1),
+    Question("Hvor mange av hvert dyr tok Moses med på arken?",
+             ["2", "14", "1", "0", "7"], 3),
+    Question("Hva kan du holde i venstre hånd, men aldri i høyre hånd?",
+             ["høyre albue", "venstre albue", "høyre hånd", "venstre kne", "egen skygge"], 0),
+    Question("Hvor mange egg tilsvarer et strutseegg",
+             ["ca. 12 egg", "ca. 100 egg", "ca. 24 egg", "ca. 6 egg", "ca. 40 egg"], 2),
+    Question("Hvilket dyr har fingeravtrykk som er nesten identiske med menneskers?",
+             ["gorilla", "koala", "sjimpanse", "vaskebjørn", "orangutang"], 1),
+    Question("Hvor raskt er et nys?",
+             ["opptil 10km/t", "opptil 60km/t", "opptil 120km/t", "opptil 160km/t", "opptil 220km/t"], 3),
+    Question("Hva heter Norges lengste fjord?",
+             ["oslofjorden", "hardangerfjorden", "geirangerfjorden", "sognefjorden", "trondheimsfjorden"], 3),
+    Question("Hva het Norges første kvinnelige statsminister?",
+             ["Anne Enger", "Erna Solberg", "Gro Harlem Brundtland", "Siv Jensen", "Kirsti Kolle Grøndahl"], 2),
+    Question("Hvilket land har flest tidssoner?",
+             ["Frankrike", "Russland", "USA", "Kina", "Australia"], 0),
+    Question("Hva er verdens største ørken?",
+             ["Gobi", "Sahara", "Kalahari", "Antarktis", "Arabiske ørken"], 3),
+    Question("Hvilket land har lengst kystlinje i verden?",
+             ["Australia", "Norge", "Canada", "Russland", "Indonesia"], 2),
+    Question("Hvor mange strenger har en fiolin?",
+             ["fire", "seks", "to", "tre", "fem"], 0),
+    Question("Hvor mange måneder i året har 31 dager?",
+             ["seks", "tolv", "åtte", "fem", "syv"], 4),
+    Question("Hva kalles vitenskapen som studerer vær og klima?",
+             ["oseanografi", "meteorologi", "geologi", "astronomi", "seismologi"], 1),
+    Question("Hvilken fugl ble valgt til Norges nasjonalfugl i 1963?",
+             ["fossekall", "havørn", "lundefugl", "ravn", "kjøttmeis"], 0),
+    Question('Hvem skrev eventyret om "Den stygge andungen"?',
+             ["Astrid Lindgren", "Brødrene Grimm", "Asbjørnsen og Moe", "H. C. Andersen", "Thorbjørn Egner"], 3),
+    Question("Hvilket metall er flytende ved romtemperatur?",
+             ["tinn", "kvikksølv", "bly", "aluminium", "natrium"], 1),
+    Question("Hvilken farge har solen, fysisk sett?",
+             ["oransje", "gul", "hvit", "rød", "blå"], 2),
+    Question("Hvor mange spillere er det på hvert lag i strandvolleyball?",
+             ["seks", "fire", "én", "tre", "to"], 4),
+    Question("Hvor mange ganger kan tallet 1 trekkes fra 1111?",
+             ["fire ganger", "1111 ganger", "en gang", "elleve ganger", "uendelig mange ganger"], 2),
+    Question("Hvor høy er Erling Braut Haaland?",
+             ["1,91 m", "1,92 m", "1,93 m", "1,94 m", "1,95 m"], 4),
+    Question("Hva står VG for?",
+             ["Verdens Gangart", "Verdens Gåte", "Vårt Grunnlag", "Verdens Gang", "Verdens Grunnlag"], 3),
+    Question("Hva er en NPU?",
+             ["Null Peiling, (U)kis", "Nordic Processing Unit", "Node Power Unit", "Neural Processing Unit"], 3),
+    Question("Hva er favorittfargen til Selma?",
+             ["rød", "svart", "rosa", "grønn"], 3),
+    Question("Hva er favorittfargen til Maria?",
+             ["rød", "blå", "rosa", "grønn"], 1),
+    Question("Hva er favorittfargen til Nicholas?",
+             ["rød", "svart", "rosa", "grønn"], 1),
+    Question("Hva heter statsministeren i Storbritannia?",
+             ["Keir Starmer", "John Hopkins", "Andy Burnham", "Connor Man"], 2),
 ]
+
+
+def pick_questions(pot=QUESTIONS, count=QUESTIONS_PER_RUN):
+    """Draw `count` questions from `pot` at random, without repeats.
+
+    @return a new list; the whole pot (shuffled) if it holds fewer than `count`.
+    """
+    return random.sample(pot, min(count, len(pot)))
 
 
 def _wrap_text(text, font, max_width):
@@ -77,17 +159,27 @@ def _ask(screen, clock, controller, question, index, total, assets):
     prompt_lines = _wrap_text(question.prompt, prompt_font, width - 2 * margin)
     line_h = prompt_font.get_linesize()
 
-    # K_1..K_9 -> option 0..8 (finger-count stand-in), capped to the options.
+    # K_1..K_9 -> option 0..8 (a finger count of N picks option N), capped to
+    # the options. K_0 is deliberately absent: showing zero fingers picks
+    # nothing, so a "ZERO" prediction falls through and is ignored.
     digit_keys = {getattr(pygame, f"K_{n}"): n - 1 for n in range(1, 10)}
 
     selected = 0
     while True:
-        # HOOK: controller directions are dropped for now. When the finger
-        # counter lands, translate a count here into the chosen option index.
+        # Directions mean nothing in the quiz; drop them so they don't pile up.
         while not controller.directions.empty():
             controller.directions.get()
 
-        for event in pygame.event.get():
+        # Turn each finger digit into the number key the player would have
+        # pressed, then let the normal keyboard handling below do the rest.
+        events = list(pygame.event.get())
+        while not controller.digits.empty():
+            digit = controller.digits.get()
+            key = getattr(pygame, f"K_{digit}", None)
+            if key is not None:
+                events.append(pygame.event.Event(pygame.KEYDOWN, key=key))
+
+        for event in events:
             if event.type == pygame.QUIT:
                 return None
             if event.type == pygame.KEYDOWN:
@@ -117,16 +209,25 @@ def _ask(screen, clock, controller, question, index, total, assets):
         left_x = margin
         right_x = width - margin
         options_top = prompt_top + len(prompt_lines) * line_h + 90
-        gap = 110
+        gap = 112
         for i, text in enumerate(question.options):
             is_sel = (i == selected)
             row_y = options_top + i * gap
 
-            text_surf = option_font.render(text, True, TEXT_COLOR)
-            text_rect = text_surf.get_rect(midleft=(left_x, row_y))
-
             img = finger_imgs[i] if i < len(finger_imgs) else None
             img_rect = img.get_rect(midright=(right_x, row_y)) if img else None
+
+            # Options come from questions.md and can be long ("en person som
+            # ikke er interessert i politikk"), so squeeze any that would
+            # otherwise run into the finger graphic on the right.
+            text_surf = option_font.render(text, True, TEXT_COLOR)
+            room = (img_rect.left - 24 if img_rect else right_x) - left_x
+            if text_surf.get_width() > room:
+                scale = room / text_surf.get_width()
+                text_surf = pygame.transform.smoothscale(
+                    text_surf,
+                    (room, max(1, round(text_surf.get_height() * scale))))
+            text_rect = text_surf.get_rect(midleft=(left_x, row_y))
 
             if is_sel:
                 tops = [text_rect.top] + ([img_rect.top] if img_rect else [])
@@ -142,7 +243,7 @@ def _ask(screen, clock, controller, question, index, total, assets):
                 screen.blit(img, img_rect)
 
         hint = hint_font.render(
-            f"Press 1-{len(question.options)}    or    UP / DOWN + ENTER",
+            f"Show or press 1-{len(question.options)}    or    UP / DOWN + ENTER",
             True, TEXT_COLOR)
         screen.blit(hint, hint.get_rect(center=(cx, height - 60)))
 
@@ -151,15 +252,19 @@ def _ask(screen, clock, controller, question, index, total, assets):
 
 
 def run(screen, clock, controller):
-    """Ask every question in order and return the number answered correctly.
+    """Ask QUESTIONS_PER_RUN random questions, returning the number answered right.
+
+    The questions are drawn fresh from the pot on every call, so "Restart" on
+    the game-over screen gives a different set rather than a replay.
 
     @return the score (int), or None if the player closed the window.
     """
     # Finger-count graphics, one per option (option i -> i+1 fingers), scaled
-    # to a common height while keeping their aspect ratio.
-    finger_h = 96
+    # to a common height while keeping their aspect ratio. Five of them, since
+    # questions.md allows up to MAX_OPTIONS options.
+    finger_h = 84
     finger_imgs = []
-    for name in ("one", "two", "three", "four"):
+    for name in ("one", "shaka", "rocknroll", "four", "five"):
         img = pygame.image.load(f'Graphics/{name}.png').convert_alpha()
         w, h = img.get_size()
         finger_imgs.append(
@@ -173,13 +278,15 @@ def run(screen, clock, controller):
         finger_imgs,
     )
 
-    # Drop anything the controller queued before the quiz started.
-    while not controller.directions.empty():
-        controller.directions.get()
+    # Drop anything the controller queued before the quiz started, so a digit
+    # shown while the menu was up doesn't answer the first question.
+    controller.drain()
+
+    questions = pick_questions()
 
     score = 0
-    total = len(QUESTIONS)
-    for index, question in enumerate(QUESTIONS):
+    total = len(questions)
+    for index, question in enumerate(questions):
         choice = _ask(screen, clock, controller, question, index, total, assets)
         if choice is None:  # window closed mid-quiz
             return None

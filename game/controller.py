@@ -1,17 +1,22 @@
-"""Voice/gesture controller: reads BLE-relayed commands from the DK over serial.
+"""Voice/gesture/finger-digit controller: reads BLE-relayed commands over serial.
 
-The game_controller dongle sends direction commands over BLE (Nordic UART
-Service); the game_receiver app on the DK acts as the BLE central and relays
-each one onto its console UART as a plain-text line, notably:
+A sender board (the game_controller dongle, or the finger_digits classifier)
+sends short command tokens over BLE (Nordic UART Service); the game_receiver app
+on the DK acts as the BLE central and relays each one onto its console UART as a
+plain-text line. Two token families are understood:
 
-    Command: UP
-    Command: DOWN
-    Command: LEFT
-    Command: RIGHT
+    Command: UP  / DOWN / LEFT / RIGHT          -> directions (snake)
+    Command: ZERO / ONE / ... / FIVE            -> finger digits 0-5 (quiz)
+
+The finger_digits firmware only emits a digit once it has seen the same
+prediction five times in a row, so each token here is already a settled choice,
+not a raw per-frame prediction; "unknown" is never sent.
 
 This module opens the serial port in a background thread, parses those lines and
-pushes the corresponding direction onto a thread-safe queue that the game loop
-drains. Non-direction commands (and all other status lines) are ignored.
+pushes each event onto a thread-safe queue that the game loop drains --
+directions onto @ref SerialController.directions, digits onto @ref
+SerialController.digits. Unrecognized commands and all other status lines are
+ignored.
 """
 
 from __future__ import annotations
@@ -36,6 +41,18 @@ DIRECTIONS = {
     "DOWN": (0, 1),
     "LEFT": (-1, 0),
     "RIGHT": (1, 0),
+}
+
+# Finger-digit tokens from the finger_digits classifier -> the digit shown.
+# Games map these onto the matching number key (see quiz.py), so a digit is
+# equivalent to the player pressing 0-5 on the keyboard.
+DIGITS = {
+    "ZERO": 0,
+    "ONE": 1,
+    "TWO": 2,
+    "THREE": 3,
+    "FOUR": 4,
+    "FIVE": 5,
 }
 
 _KEYWORD_RE = re.compile(r"Command:\s*(\w+)")
@@ -173,13 +190,15 @@ def find_controller_port(baudrate: int = 115200) -> str | None:
 
 
 class SerialController:
-    """Background reader that turns serial keyword events into directions."""
+    """Background reader that turns serial keyword events into game input."""
 
     def __init__(self, port: str | None = None, baudrate: int = 115200):
         # port=None auto-detects the firmware port at start().
         self.port = port
         self.baudrate = baudrate
         self.directions: "queue.Queue[tuple[int, int]]" = queue.Queue()
+        # Settled finger digits (0-5), one entry per token received.
+        self.digits: "queue.Queue[int]" = queue.Queue()
         self._serial: serial.Serial | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -217,9 +236,20 @@ class SerialController:
             match = _KEYWORD_RE.search(line)
             if not match:
                 continue
-            direction = DIRECTIONS.get(match.group(1))
+            token = match.group(1)
+            direction = DIRECTIONS.get(token)
             if direction is not None:
                 self.directions.put(direction)
+                continue
+            digit = DIGITS.get(token)
+            if digit is not None:
+                self.digits.put(digit)
+
+    def drain(self) -> None:
+        """Discard queued input, so stale events don't leak across screens."""
+        for q in (self.directions, self.digits):
+            while not q.empty():
+                q.get()
 
 if __name__ == "__main__":
     import sys
@@ -234,9 +264,19 @@ if __name__ == "__main__":
     controller.start()
     print(f"Listening on {controller.port} @ {baud} (Ctrl-C to stop)...")
     try:
+        # Poll both queues; either family of tokens can arrive, depending on
+        # which sender board is paired with the receiver.
         while True:
-            direction = controller.directions.get()  # blocks until one arrives
-            print(f"{NAMES[direction]:<5} {direction}")
+            got = False
+            while not controller.directions.empty():
+                direction = controller.directions.get()
+                print(f"{NAMES[direction]:<5} {direction}")
+                got = True
+            while not controller.digits.empty():
+                print(f"digit {controller.digits.get()}")
+                got = True
+            if not got:
+                time.sleep(0.05)
     except KeyboardInterrupt:
         pass
     finally:
