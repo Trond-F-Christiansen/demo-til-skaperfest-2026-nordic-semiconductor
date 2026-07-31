@@ -27,6 +27,7 @@
 LOG_MODULE_REGISTER(ble_central, LOG_LEVEL_INF);
 
 #define SCORE_PREFIX "SCORE:"
+#define MENU_PREFIX "MENU:"
 
 static struct bt_conn *default_conn;
 static struct bt_nus_client nus_client;
@@ -75,8 +76,17 @@ static uint8_t nus_data_received(struct bt_nus_client *nus, const uint8_t *data,
 
 		return BT_GATT_ITER_CONTINUE;
 	}
+	/* Menyvalg fra controller-knappene sendes ut med eget prefiks slik at
+	 * PC-en kan skille dem fra vanlige stemmekommandoer.
+	 */
+	if ((len >= strlen(MENU_PREFIX)) &&
+	    (memcmp(data, MENU_PREFIX, strlen(MENU_PREFIX)) == 0)) {
+		printk("%.*s\r\n", len, data);
+		return BT_GATT_ITER_CONTINUE;
+	}
 
 	printk("Command: %.*s\r\n", len, data);
+	
 
 	return BT_GATT_ITER_CONTINUE;
 }
