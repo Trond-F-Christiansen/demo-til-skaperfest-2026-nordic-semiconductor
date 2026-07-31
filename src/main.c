@@ -18,15 +18,33 @@
 
 LOG_MODULE_REGISTER(main);
 
-static void on_button_click(button_click_t click)
+static void on_button_click(uint8_t button_id, button_click_t click)
 {
-	if (click == BUTTON_CLICK_SHORT) {
-		engine_request_switch();
-	} else {
-		LOG_INF("Long click (no action yet)");
+	if (click != BUTTON_CLICK_SHORT) {
+		LOG_INF("Long click on btn%u (no action yet)", button_id);
+		return;
+	}
+
+	switch (button_id) {
+	case 0:
+		// Snake -> KWS-engine
+		engine_request_select("KWS");
+		ble_nus_send_raw("MENU:SNAKE\r\n");
+		break;
+	case 1:
+		// Quiz -> camera-engine (ikke implementert ennaa)
+		ble_nus_send_raw("MENU:QUIZ\r\n");
+		break;
+	case 2:
+		// Minesweeper -> KWS_MINE-engine
+		engine_request_select("KWS_MINE");
+		ble_nus_send_raw("MENU:MINESWEEPER\r\n");
+		break;
+	default:
+		LOG_WRN("Ukjent knapp: %u", button_id);
+		break;
 	}
 }
-
 int main(void)
 {
 	int err;

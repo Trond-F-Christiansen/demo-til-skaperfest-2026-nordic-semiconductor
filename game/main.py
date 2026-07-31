@@ -57,7 +57,7 @@ GAMES = [
 ]
 
 
-def choose(screen, clock, controller, title, options, subtitle=None):
+def choose(screen, clock, controller, title, options, subtitle=None, menu_map=None):
     """Render a vertical menu and return the chosen option index.
 
     @param options   list of label strings, drawn top to bottom.
@@ -83,6 +83,10 @@ def choose(screen, clock, controller, title, options, subtitle=None):
         while not controller.directions.empty():
             controller.directions.get()
 
+        if menu_map is not None:
+            token = controller.get_menu()
+            if token is not None and token in menu_map:
+                return menu_map[token]
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return None
@@ -129,8 +133,10 @@ def run_app(screen, clock, controller):
     """Top-level state machine: menu -> play -> game over -> restart/menu."""
     while True:
         # --- main menu: choose a game ---
+        menu_map = {g.name.upper(): i for i, g in enumerate(GAMES)}
         choice = choose(screen, clock, controller,
-                        "Edge AI Games", [g.name for g in GAMES])
+                        "Edge AI Games", [g.name for g in GAMES],
+                        menu_map=menu_map)
         if choice is None:
             return
         game = GAMES[choice]

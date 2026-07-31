@@ -50,7 +50,7 @@ COMMANDS = {
     "NO": "no",
 }
 _KEYWORD_RE = re.compile(r"Command:\s*(\w+)")
-
+_MENU_RE = re.compile(r"MENU:(\w+)")
 # Lines that only game_receiver's firmware ever prints, used to tell its
 # console apart from another DK's console when both are plugged in at once
 # (see _probe_is_receiver()). Deliberately narrow: e.g. "Bluetooth
@@ -192,6 +192,7 @@ class SerialController:
         self.baudrate = baudrate
         self.directions: "queue.Queue[tuple[int, int]]" = queue.Queue()
         self.commands: "queue.Queue[tuple[str, object]]" = queue.Queue() #minesweeper-commands
+        self.menu: "queue.Queue[str]" = queue.Queue()  # menyvalg fra controller-knapper
         self._serial: serial.Serial | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -250,6 +251,10 @@ class SerialController:
                 break
             if not line:
                 continue
+            menu_match = _MENU_RE.search(line)
+            if menu_match:
+                self.menu.put(menu_match.group(1).upper())
+                continue
             match = _KEYWORD_RE.search(line)
             if not match:
                 continue
@@ -270,7 +275,13 @@ class SerialController:
             if word in COMMANDS:
                 self.commands.put(("command", COMMANDS[word]))
                 continue
-
+    def get_menu(self):
+        # Returnerer neste menyvalg ("SNAKE"/"QUIZ"/"MINESWEEPER") eller None.
+        try:
+            return self.menu.get_nowait()
+        except queue.Empty:
+            return None
+            
     def get_command(self, max_square: int | None = None):
     #returnerer samme format som minesweeper forventer
         try:
