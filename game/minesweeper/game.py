@@ -3,7 +3,7 @@
 from random import randrange
 import pygame
 
-from config import (
+from .config import (
     WIDTH, HEIGHT, NSQUARES, MARGIN, MENU_SIZE,
     GREEN1, WHITE, RED1, RED, GRAY,
     LEFT_CLICK, RIGHT_CLICK, LABEL_SIZE, NUM_BOMBS, HIGHLIGHT,  NUMBER_COLORS

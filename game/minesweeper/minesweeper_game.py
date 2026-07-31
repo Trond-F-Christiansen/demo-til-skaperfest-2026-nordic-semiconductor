@@ -2,11 +2,11 @@ import sys
 import time
 import pygame
 
-from config import (
+from .config import (
     WIDTH, HEIGHT, LABEL_SIZE, NSQUARES, MARGIN, MENU_SIZE, LEFT_CLICK, RIGHT_CLICK, DIFFICULTIES, GREEN1
 )
-from game import Game
-from menu import Menu
+from .game import Game
+from .menu import Menu
 
 
 
@@ -194,7 +194,7 @@ def main(controller, screen):
                     #game.start_time = pygame.time.get_ticks()
 
         screen.fill(GREEN1)
-        draw_info(screen, win_h)                      # ← infoboks til venstre
+        draw_info(screen, win_h)                      
         game.draw(board_surf, font, state)
         handle_voice_input(game, state, controller)
 

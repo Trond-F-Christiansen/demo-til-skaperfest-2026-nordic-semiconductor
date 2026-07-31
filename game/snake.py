@@ -176,6 +176,8 @@ class MAIN:
         return len(self.snake.body) - 3
 
     def game_over(self):
+        if not self.alive:          
+            return
         score = len(self.snake.body) - 3
         self.controller.send_score("snake", score)
         self.alive = False

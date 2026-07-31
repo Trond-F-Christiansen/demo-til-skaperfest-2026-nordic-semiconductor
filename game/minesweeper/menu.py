@@ -1,7 +1,7 @@
 #også lånt kode
 import pygame
 
-from config import MARGIN, MENU_SIZE, GREEN1, WHITE, RED1, GRAY, LABEL_SIZE
+from .config import MARGIN, MENU_SIZE, GREEN1, WHITE, RED1, GRAY, LABEL_SIZE
 
 class Menu:
 

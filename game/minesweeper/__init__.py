@@ -8,7 +8,7 @@ The menu calls run(screen, clock, controller). Minesweeper has its own loop
 """
 
 import pygame
-import minesweeper_game
+from . import minesweeper_game
 
 
 def run(screen, clock, controller):
