@@ -142,10 +142,11 @@ class SNAKE:
 
 
 class MAIN:
-    def __init__(self):
+    def __init__(self,controller=None):
         self.snake = SNAKE()
         self.fruit = FRUIT()
         self.alive = True  # cleared by game_over(); run() returns once False
+        self.controller = controller
 
     def update(self):
         self.snake.move_snake()
@@ -175,8 +176,10 @@ class MAIN:
         return len(self.snake.body) - 3
 
     def game_over(self):
-        # Signal the run() loop to stop; it returns the score to main.py, which
-        # owns the window/controller and shows the game-over menu.
+        if not self.alive:          
+            return
+        score = len(self.snake.body) - 3
+        self.controller.send_score("snake", score)
         self.alive = False
 
     def draw_grass(self):
@@ -235,7 +238,7 @@ def run(shared_screen, clock, controller):
     while not controller.directions.empty():
         controller.directions.get()
 
-    main_game = MAIN()
+    main_game = MAIN(controller)
     pygame.time.set_timer(SCREEN_UPDATE, TICK_MS)
     try:
         while True:

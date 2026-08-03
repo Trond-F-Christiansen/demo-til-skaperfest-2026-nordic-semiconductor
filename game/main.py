@@ -26,6 +26,8 @@ import pygame
 
 import quiz
 import snake
+import minesweeper
+
 from controller import SerialController
 
 # Window matches snake's 25 x 40px grid. New games should draw within this.
@@ -39,7 +41,6 @@ HILITE_BG = "#003C66"
 FONT_PATH = 'Font/PoetsenOne-Regular.ttf'
 FONT_PATH_HELVETICA = "Font/Helvetica.ttf"
 
-
 class Game:
     """A menu-selectable game: a display name and its run() entry point."""
 
@@ -52,11 +53,11 @@ class Game:
 GAMES = [
     Game("Snake", snake.run),
     Game("Quiz", quiz.run),
-    # Game("Tetris", tetris.run),
+    Game("Minesweeper", minesweeper.run),
 ]
 
 
-def choose(screen, clock, controller, title, options, subtitle=None):
+def choose(screen, clock, controller, title, options, subtitle=None, menu_map=None, hint=None):
     """Render a vertical menu and return the chosen option index.
 
     @param options   list of label strings, drawn top to bottom.
@@ -82,6 +83,10 @@ def choose(screen, clock, controller, title, options, subtitle=None):
         while not controller.directions.empty():
             controller.directions.get()
 
+        if menu_map is not None:
+            token = controller.get_menu()
+            if token is not None and token in menu_map:
+                return menu_map[token]
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return None
@@ -117,8 +122,9 @@ def choose(screen, clock, controller, title, options, subtitle=None):
                 pygame.draw.rect(screen, TEXT_COLOR, box, 3, border_radius=8)
             screen.blit(surf, rect)
 
-        hint = hint_font.render("UP / DOWN to move    ENTER to select", True, TEXT_COLOR)
-        screen.blit(hint, hint.get_rect(center=(cx, WINDOW_SIZE[1] - 70)))
+        if hint:
+            hint_surf = hint_font.render(hint, True, TEXT_COLOR)
+            screen.blit(hint_surf, hint_surf.get_rect(center=(cx, WINDOW_SIZE[1] - 70)))
 
         pygame.display.update()
         clock.tick(60)
@@ -128,8 +134,11 @@ def run_app(screen, clock, controller):
     """Top-level state machine: menu -> play -> game over -> restart/menu."""
     while True:
         # --- main menu: choose a game ---
+        menu_map = {g.name.upper(): i for i, g in enumerate(GAMES)}
         choice = choose(screen, clock, controller,
-                        "Edge AI Games", [g.name for g in GAMES])
+                        "Edge AI Games", [g.name for g in GAMES],
+                        menu_map=menu_map,
+                        hint="BTN0: Snake    BTN1: Quiz    BTN2: Minesweeper")
         if choice is None:
             return
         game = GAMES[choice]
@@ -145,6 +154,8 @@ def run_app(screen, clock, controller):
                 "Game Over",
                 ["Restart", "Main Menu"],
                 subtitle=f"{game.name}    Score: {score}",
+                menu_map={"SNAKE": 0, "QUIZ": 1},
+                hint="BTN0: Restart    BTN1: Main Menu",
             )
             if action is None:      # quit
                 return

@@ -37,9 +37,20 @@ DIRECTIONS = {
     "LEFT": (-1, 0),
     "RIGHT": (1, 0),
 }
+#for minesweeper
+KEYWORDS = {
+    "ZERO": 0, "ONE": 1, "TWO": 2, "THREE": 3,
+    "FOUR": 4, "FIVE": 5, "SIX": 6, "SEVEN": 7,
+}
 
+COMMANDS = {
+    "RESET": "reset",
+    "FLAG": "flag",
+    "OPEN": "open",
+    "NO": "no",
+}
 _KEYWORD_RE = re.compile(r"Command:\s*(\w+)")
-
+_MENU_RE = re.compile(r"MENU:(\w+)")
 # Lines that only game_receiver's firmware ever prints, used to tell its
 # console apart from another DK's console when both are plugged in at once
 # (see _probe_is_receiver()). Deliberately narrow: e.g. "Bluetooth
@@ -180,6 +191,8 @@ class SerialController:
         self.port = port
         self.baudrate = baudrate
         self.directions: "queue.Queue[tuple[int, int]]" = queue.Queue()
+        self.commands: "queue.Queue[tuple[str, object]]" = queue.Queue() #minesweeper-commands
+        self.menu: "queue.Queue[str]" = queue.Queue()  # menyvalg fra controller-knapper
         self._serial: serial.Serial | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -205,6 +218,30 @@ class SerialController:
         if self._serial is not None:
             self._serial.close()
 
+    #---new function-----
+    #send scores to 54
+    def send_score(self, game: str, score: int, extra: dict | None = None) -> None:
+        """Send a highscore line to the DK, which forwards it to the nRF9151.
+
+        Format: <game>|<json>\n
+        """
+        if self._serial is None:
+            print("[controller] cannot send score: serial not open")
+            return
+
+        import json
+
+        payload = {"score": score}
+        if extra:
+            payload.update(extra)
+
+        line = "%s|%s\n" % (game, json.dumps(payload))
+        try:
+            self._serial.write(line.encode("utf-8"))
+            print(f"[controller] score sent: {line.strip()}")
+        except (serial.SerialException, OSError) as exc:
+            print(f"[controller] failed to send score: {exc}")
+
     def _run(self) -> None:
         assert self._serial is not None
         while not self._stop.is_set():
@@ -214,12 +251,48 @@ class SerialController:
                 break
             if not line:
                 continue
+            menu_match = _MENU_RE.search(line)
+            if menu_match:
+                self.menu.put(menu_match.group(1).upper())
+                continue
             match = _KEYWORD_RE.search(line)
             if not match:
                 continue
-            direction = DIRECTIONS.get(match.group(1))
+            word = match.group(1)   
+
+            # 1) Retning (Snake/Quiz)
+            direction = DIRECTIONS.get(word)
             if direction is not None:
                 self.directions.put(direction)
+                continue
+
+            # 2) Tall (Minesweeper)
+            if word in KEYWORDS:
+                self.commands.put(("number", KEYWORDS[word]))
+                continue
+
+            # 3) Kommando (Minesweeper)
+            if word in COMMANDS:
+                self.commands.put(("command", COMMANDS[word]))
+                continue
+    def get_menu(self):
+        # Returnerer neste menyvalg ("SNAKE"/"QUIZ"/"MINESWEEPER") eller None.
+        try:
+            return self.menu.get_nowait()
+        except queue.Empty:
+            return None
+            
+    def get_command(self, max_square: int | None = None):
+    #returnerer samme format som minesweeper forventer
+        try:
+            kind, value = self.commands.get_nowait()
+        except queue.Empty:
+            return None
+
+        if kind == "number" and max_square is not None and value >= max_square:
+            return None  #vil ikke ha tall utafor brettet
+
+        return (kind, value)
 
 if __name__ == "__main__":
     import sys
@@ -231,6 +304,7 @@ if __name__ == "__main__":
     NAMES = {v: k for k, v in DIRECTIONS.items()}
 
     controller = SerialController(port, baud)
+    #controller = SerialController(port='/dev/ttyACM1', baudrate=115200)
     controller.start()
     print(f"Listening on {controller.port} @ {baud} (Ctrl-C to stop)...")
     try:

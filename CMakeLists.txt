@@ -21,6 +21,10 @@ target_sources(app PRIVATE
   src/kws/dmic.c
   src/kws/kws.c
   src/kws/Snake_94502_kws/nrf_edgeai_generated/nrf_edgeai_user_model.c
+
+  src/kws/kws_mine.c
+  src/kws/Minesweeper_94292_kws_generated/nrf_edgeai_user_model.c
+  src/engine/kws_mine_engine.c
 )
 
 # dmic.h / kws.h are referenced as "dmic.h" / "kws.h" from within src/kws;

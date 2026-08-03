@@ -43,6 +43,19 @@ int ble_nus_init(void);
  * @retval other negative errno from the BLE stack.
  */
 int ble_nus_send_command(enum game_command cmd);
+/**
+ * @brief Send a raw ASCII token to the connected central.
+ *
+ * Used by engines whose model classes do not map to @ref game_command
+ * (e.g. Minesweeper: "FLAG\r\n", "ZERO\r\n"). The string is sent verbatim.
+ *
+ * @param token NUL-terminated string to send (should end in "\r\n").
+ *
+ * @retval 0 on success.
+ * @retval -EINVAL if @p token is NULL.
+ * @retval -ENOTCONN if no central is connected or notifications are disabled.
+ */
+int ble_nus_send_raw(const char *token);
 
 #ifdef __cplusplus
 }
