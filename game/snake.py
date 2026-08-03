@@ -21,8 +21,8 @@ from pygame.math import Vector2
 
 # Grid geometry. Window is cell_number * cell_size on each side (1000 x 1000),
 # which main.py uses to size the shared window.
-cell_size = 40
-cell_number = 25
+cell_size = 57
+cell_number = 18
 screen_color = (175, 215, 70)
 
 # How often the snake advances, in milliseconds.
@@ -63,23 +63,34 @@ class SNAKE:
         self.next_direction = Vector2(1, 0)
         self.new_block = False
 
-        self.head_up = pygame.image.load('Graphics/head_up.png').convert_alpha()
-        self.head_down = pygame.image.load('Graphics/head_down.png').convert_alpha()
-        self.head_left = pygame.image.load('Graphics/head_left.png').convert_alpha()
-        self.head_right = pygame.image.load('Graphics/head_right.png').convert_alpha()
+        self.head_up = self._load_cell('head_up')
+        self.head_down = self._load_cell('head_down')
+        self.head_left = self._load_cell('head_left')
+        self.head_right = self._load_cell('head_right')
 
-        self.tail_up = pygame.image.load('Graphics/tail_up.png').convert_alpha()
-        self.tail_down = pygame.image.load('Graphics/tail_down.png').convert_alpha()
-        self.tail_right = pygame.image.load('Graphics/tail_right.png').convert_alpha()
-        self.tail_left = pygame.image.load('Graphics/tail_left.png').convert_alpha()
+        self.tail_up = self._load_cell('tail_up')
+        self.tail_down = self._load_cell('tail_down')
+        self.tail_right = self._load_cell('tail_right')
+        self.tail_left = self._load_cell('tail_left')
 
-        self.body_vertical = pygame.image.load('Graphics/body_vertical.png').convert_alpha()
-        self.body_horizontal = pygame.image.load('Graphics/body_horizontal.png').convert_alpha()
+        self.body_vertical = self._load_cell('body_vertical')
+        self.body_horizontal = self._load_cell('body_horizontal')
 
-        self.body_tr = pygame.image.load('Graphics/body_tr.png').convert_alpha()
-        self.body_tl = pygame.image.load('Graphics/body_tl.png').convert_alpha()
-        self.body_br = pygame.image.load('Graphics/body_br.png').convert_alpha()
-        self.body_bl = pygame.image.load('Graphics/body_bl.png').convert_alpha()
+        self.body_tr = self._load_cell('body_tr')
+        self.body_tl = self._load_cell('body_tl')
+        self.body_br = self._load_cell('body_br')
+        self.body_bl = self._load_cell('body_bl')
+
+    @staticmethod
+    def _load_cell(name):
+        """Load Graphics/<name>.png scaled to exactly one grid cell.
+
+        The source art is 40x40, sized for the original cell_size of 40. Blits
+        ignore the destination rect's size, so the sprites have to be scaled
+        here or they render at 40x40 whatever cell_size is set to.
+        """
+        img = pygame.image.load(f'Graphics/{name}.png').convert_alpha()
+        return pygame.transform.smoothscale(img, (cell_size, cell_size))
 
     def draw_snake(self):
         self.update_head_graphics()
