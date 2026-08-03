@@ -42,10 +42,16 @@ DIRECTIONS = {
     "LEFT": (-1, 0),
     "RIGHT": (1, 0),
 }
+#for minesweeper
+KEYWORDS = {
+    "ZERO": 0, "ONE": 1, "TWO": 2, "THREE": 3,
+    "FOUR": 4, "FIVE": 5, "SIX": 6, "SEVEN": 7,
+}
 
 # Finger-digit tokens from the finger_digits classifier -> the digit shown.
 # Games map these onto the matching number key (see quiz.py), so a digit is
-# equivalent to the player pressing 0-5 on the keyboard.
+# equivalent to the player pressing 0-5 on the keyboard. A subset of KEYWORDS:
+# the quiz only goes up to five (one hand), minesweeper wants 0-7.
 DIGITS = {
     "ZERO": 0,
     "ONE": 1,
@@ -55,8 +61,15 @@ DIGITS = {
     "FIVE": 5,
 }
 
+#for minesweeper
+COMMANDS = {
+    "RESET": "reset",
+    "FLAG": "flag",
+    "OPEN": "open",
+    "NO": "no",
+}
 _KEYWORD_RE = re.compile(r"Command:\s*(\w+)")
-
+_MENU_RE = re.compile(r"MENU:(\w+)")
 # Lines that only game_receiver's firmware ever prints, used to tell its
 # console apart from another DK's console when both are plugged in at once
 # (see _probe_is_receiver()). Deliberately narrow: e.g. "Bluetooth
@@ -199,6 +212,8 @@ class SerialController:
         self.directions: "queue.Queue[tuple[int, int]]" = queue.Queue()
         # Settled finger digits (0-5), one entry per token received.
         self.digits: "queue.Queue[int]" = queue.Queue()
+        self.commands: "queue.Queue[tuple[str, object]]" = queue.Queue() #minesweeper-commands
+        self.menu: "queue.Queue[str]" = queue.Queue()  # menyvalg fra controller-knapper
         self._serial: serial.Serial | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -224,6 +239,30 @@ class SerialController:
         if self._serial is not None:
             self._serial.close()
 
+    #---new function-----
+    #send scores to 54
+    def send_score(self, game: str, score: int, extra: dict | None = None) -> None:
+        """Send a highscore line to the DK, which forwards it to the nRF9151.
+
+        Format: <game>|<json>\n
+        """
+        if self._serial is None:
+            print("[controller] cannot send score: serial not open")
+            return
+
+        import json
+
+        payload = {"score": score}
+        if extra:
+            payload.update(extra)
+
+        line = "%s|%s\n" % (game, json.dumps(payload))
+        try:
+            self._serial.write(line.encode("utf-8"))
+            print(f"[controller] score sent: {line.strip()}")
+        except (serial.SerialException, OSError) as exc:
+            print(f"[controller] failed to send score: {exc}")
+
     def _run(self) -> None:
         assert self._serial is not None
         while not self._stop.is_set():
@@ -233,23 +272,60 @@ class SerialController:
                 break
             if not line:
                 continue
+            menu_match = _MENU_RE.search(line)
+            if menu_match:
+                self.menu.put(menu_match.group(1).upper())
+                continue
             match = _KEYWORD_RE.search(line)
             if not match:
                 continue
-            token = match.group(1)
-            direction = DIRECTIONS.get(token)
+            word = match.group(1)
+
+            # 1) Retning (Snake/Quiz)
+            direction = DIRECTIONS.get(word)
             if direction is not None:
                 self.directions.put(direction)
                 continue
-            digit = DIGITS.get(token)
-            if digit is not None:
-                self.digits.put(digit)
+
+            # 2) Tall. Minesweeper reads them as ("number", n) off self.commands;
+            #    the quiz reads 0-5 off self.digits. Post to both queues and let
+            #    each game take from the one it uses -- drain() clears the rest.
+            if word in KEYWORDS:
+                self.commands.put(("number", KEYWORDS[word]))
+                if word in DIGITS:
+                    self.digits.put(DIGITS[word])
+                continue
+
+            # 3) Kommando (Minesweeper)
+            if word in COMMANDS:
+                self.commands.put(("command", COMMANDS[word]))
+                continue
 
     def drain(self) -> None:
         """Discard queued input, so stale events don't leak across screens."""
-        for q in (self.directions, self.digits):
+        for q in (self.directions, self.digits, self.commands, self.menu):
             while not q.empty():
                 q.get()
+
+    def get_menu(self):
+        # Returnerer neste menyvalg ("SNAKE"/"QUIZ"/"MINESWEEPER") eller None.
+        try:
+            return self.menu.get_nowait()
+        except queue.Empty:
+            return None
+            
+    def get_command(self, max_square: int | None = None):
+    #returnerer samme format som minesweeper forventer
+        try:
+            kind, value = self.commands.get_nowait()
+        except queue.Empty:
+            return None
+
+        if kind == "number" and max_square is not None and value >= max_square:
+            return None  #vil ikke ha tall utafor brettet
+
+        return (kind, value)
+
 
 if __name__ == "__main__":
     import sys
@@ -261,6 +337,7 @@ if __name__ == "__main__":
     NAMES = {v: k for k, v in DIRECTIONS.items()}
 
     controller = SerialController(port, baud)
+    #controller = SerialController(port='/dev/ttyACM1', baudrate=115200)
     controller.start()
     print(f"Listening on {controller.port} @ {baud} (Ctrl-C to stop)...")
     try:

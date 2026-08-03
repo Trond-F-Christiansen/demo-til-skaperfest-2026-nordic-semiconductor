@@ -15,6 +15,7 @@
 LOG_MODULE_REGISTER(engine_ctrl);
 
 extern const engine_t kws_engine;
+extern const engine_t kws_mine_engine; //model for minesweeper
 #if !defined(CONFIG_KWS_ONLY)
 extern const engine_t gesture_engine;
 #endif
@@ -26,6 +27,7 @@ extern const engine_t gesture_engine;
  */
 static const engine_t *const engines[] = {
 	&kws_engine,
+	&kws_mine_engine,
 #if !defined(CONFIG_KWS_ONLY)
 	&gesture_engine,
 #endif
@@ -33,10 +35,23 @@ static const engine_t *const engines[] = {
 
 static size_t active_idx;
 static atomic_t switch_requested;
+static atomic_t requested_idx = ATOMIC_INIT(-1);   // -1 = ingen spesifikk, bruk syklisk
 
 void engine_request_switch(void)
 {
 	atomic_set(&switch_requested, 1);
+}
+
+int engine_request_select(const char *name)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(engines); i++) {
+		if (strcmp(engines[i]->name, name) == 0) {
+			atomic_set(&requested_idx, (atomic_val_t)i);
+			atomic_set(&switch_requested, 1);
+			return 0;
+		}
+	}
+	return -1;
 }
 
 int engine_controller_init(void)
@@ -73,6 +88,11 @@ void engine_controller_run(void)
 
 		e->exit();
 
-		active_idx = (active_idx + 1) % ARRAY_SIZE(engines);
+		int want = atomic_set(&requested_idx, -1);
+		if (want >= 0) {
+			active_idx = (size_t)want;
+		} else {
+			active_idx = (active_idx + 1) % ARRAY_SIZE(engines);
+		}
 	}
 }
