@@ -8,6 +8,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <errno.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/kernel.h>
@@ -121,21 +123,70 @@ static void uart_game_cb(const struct device *dev, void *user_data)
 }
 /*new for uart_game: sender linje mottat videre */
 
+
+/* Accepts both what the pygame side writes today and the plain SCORE: form:
+ *
+ *     snake|{"score": 1}   ->  game "snake", points 1
+ *     SCORE:snake:1        ->  game "snake", points 1
+ *
+ * Any session_id the PC supplied is discarded on purpose - score_bridge_send()
+ * is the only thing that builds that field.
+ */
+static int parse_game_line(char *line, const char **game, uint32_t *points)
+{
+	char *sep, *key;
+
+	if (strncmp(line, "SCORE:", 6) == 0) {
+		char *p = line + 6;
+
+		sep = strchr(p, ':');
+		if ((sep == NULL) || (sep == p) || (sep[1] == '\0')) {
+			return -EINVAL;
+		}
+		*sep = '\0';
+		*game = p;
+		*points = (uint32_t)strtoul(sep + 1, NULL, 10);
+		return 0;
+	}
+
+	sep = strchr(line, '|');
+	if ((sep == NULL) || (sep == line)) {
+		return -EINVAL;
+	}
+	*sep = '\0';
+	*game = line;
+
+	key = strstr(sep + 1, "\"score\"");
+	if ((key == NULL) || ((key = strchr(key, ':')) == NULL)) {
+		return -EINVAL;
+	}
+	*points = (uint32_t)strtoul(key + 1, NULL, 10);   /* strtoul skips the space */
+	return 0;
+}
+
 static void score_bridge_task(void)
 {
 	while (true) {
-		k_sem_take(&line_ready_sem, K_FOREVER);   // 1. Vent på en ferdig linje
+		char line[LINE_MAX + 1];
+		const char *game;
+		uint32_t points;
 
-		if (ready_len == 0) {                       // 2. Hopp over tomme linjer
+		k_sem_take(&line_ready_sem, K_FOREVER);
+
+		if ((ready_len == 0) || (ready_len > LINE_MAX)) {
 			continue;
 		}
 
-		uart_send_str((const char *)ready_line, ready_len);  // 3. Send linja videre
-		uart_poll_out(uart_dev, '\n');                   //    + newline
+		memcpy(line, ready_line, ready_len);
+		line[ready_len] = '\0';
 
-		LOG_INF("game -> nRF9151: %.*s", (int)ready_len, ready_line);  // 4. Logg
+		if (parse_game_line(line, &game, &points) != 0) {
+			LOG_WRN("Unparsable line from game UART: \"%s\"", line);
+			continue;
+		}
+
+		score_bridge_send(game, points);
 	}
 }
 
-
-K_THREAD_DEFINE(score_bridge_task_id, 1024, score_bridge_task, NULL, NULL, NULL, 7, 0, 0);
+K_THREAD_DEFINE(score_bridge_task_id, 2048, score_bridge_task, NULL, NULL, NULL, 7, 0, 0);
