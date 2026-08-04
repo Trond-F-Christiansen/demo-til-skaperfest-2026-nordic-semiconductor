@@ -1,4 +1,10 @@
-#Div variabler
+"""Minesweeper's own constants: board geometry and gameplay colours.
+
+No serial settings live here. Port selection and baud rate belong to
+controller.py alone, which autodetects the DK -- minesweeper gets its input
+from the shared SerialController like snake and quiz do.
+"""
+
 # Colors
 GREEN1 = (80, 140, 70)       # Gressgrønn
 WHITE = (240, 235, 225)     # Varm off-white
@@ -9,7 +15,8 @@ GRAY  = (200, 195, 210)     # Lys lilla-grå
 HIGHLIGHT = (255, 230, 120)   # gul markering for valgt rad
 
 
-# Grid
+# Grid. NSQUARES/NUM_BOMBS are the starting board; "easy"/"hard" swap in a
+# DIFFICULTIES entry instead. Cells are square, so one size covers both axes.
 WIDTH = 30
 HEIGHT = 30
 NSQUARES = 8
@@ -22,14 +29,11 @@ LABEL_SIZE = 30   # plass til tall langs kantene
 LEFT_CLICK = 1
 RIGHT_CLICK = 3
 
-# Serial
-SERIAL_PORT = '/dev/ttyACM3' # '/dev/serial/by-id/usb-SEGGER_J-Link_001051859487-if00' før
-BAUDRATE = 115200
-
-#vansklighetsgrader
+#vansklighetsgrader. Keep size at or below the number of spoken number tokens
+# (controller.NUMBERS, 0-7) plus one, or the far rows/columns cannot be named.
 DIFFICULTIES = {
-    "easy":   {"size": 10,  "bombs": 6},
-    "hard":   {"size": 10, "bombs": 25},
+    "easy":   {"size": 8,  "bombs": 6},
+    "hard":   {"size": 8, "bombs": 16},
 }
 
 #fargekodede tall
