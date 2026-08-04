@@ -214,13 +214,24 @@ static int scan_start(void)
 	(void)bt_scan_stop();
 	bt_scan_filter_remove_all();
 
-	err = bt_scan_filter_add(BT_SCAN_FILTER_TYPE_UUID, BT_UUID_NUS_SERVICE);
+	/* Filter on the controller's specific address so we never connect to
+	 * another NUS peripheral (e.g. a colleague's board or a spare DK).
+	 */
+	bt_addr_le_t target_addr;
+	/**/
+	err = bt_addr_le_from_str("CD:9F:8A:70:17:A9", "random", &target_addr);
 	if (err) {
-		LOG_ERR("UUID filter cannot be added (err %d)", err);
+		LOG_ERR("Invalid target address (err %d)", err);
 		return err;
 	}
 
-	err = bt_scan_filter_enable(BT_SCAN_UUID_FILTER, false);
+	err = bt_scan_filter_add(BT_SCAN_FILTER_TYPE_ADDR, &target_addr);
+	if (err) {
+		LOG_ERR("Address filter cannot be added (err %d)", err);
+		return err;
+	}
+
+	err = bt_scan_filter_enable(BT_SCAN_ADDR_FILTER, false);
 	if (err) {
 		LOG_ERR("Filters cannot be turned on (err %d)", err);
 		return err;
