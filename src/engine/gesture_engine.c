@@ -314,7 +314,7 @@ static void gesture_engine_run(atomic_t *stop)
 }
 
 const engine_t gesture_engine = {
-	.name = "Gesture",
+	.name = ENGINE_NAME_GESTURE,
 	.init = gesture_engine_init,
 	.enter = gesture_engine_enter,
 	.exit = gesture_engine_exit,

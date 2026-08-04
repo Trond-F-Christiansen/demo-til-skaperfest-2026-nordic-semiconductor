@@ -124,7 +124,7 @@ static void kws_mine_engine_run(atomic_t *stop)
 }
 
 const engine_t kws_mine_engine = {
-	.name = "KWS_MINE",
+	.name = ENGINE_NAME_KWS_MINE,
 	.init = kws_mine_engine_init,
 	.enter = kws_mine_engine_enter,
 	.exit = kws_mine_engine_exit,
