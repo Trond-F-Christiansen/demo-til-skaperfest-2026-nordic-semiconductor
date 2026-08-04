@@ -42,33 +42,32 @@ DIRECTIONS = {
     "LEFT": (-1, 0),
     "RIGHT": (1, 0),
 }
-#for minesweeper
-KEYWORDS = {
+# Number tokens -> the number said. Minesweeper reads these as board
+# coordinates, so it needs one per row/column (0-7).
+NUMBERS = {
     "ZERO": 0, "ONE": 1, "TWO": 2, "THREE": 3,
     "FOUR": 4, "FIVE": 5, "SIX": 6, "SEVEN": 7,
 }
 
 # Finger-digit tokens from the finger_digits classifier -> the digit shown.
 # Games map these onto the matching number key (see quiz.py), so a digit is
-# equivalent to the player pressing 0-5 on the keyboard. A subset of KEYWORDS:
-# the quiz only goes up to five (one hand), minesweeper wants 0-7.
-DIGITS = {
-    "ZERO": 0,
-    "ONE": 1,
-    "TWO": 2,
-    "THREE": 3,
-    "FOUR": 4,
-    "FIVE": 5,
-}
+# equivalent to the player pressing 0-5 on the keyboard. A subset of NUMBERS:
+# one hand only shows up to five.
+MAX_DIGIT = 5
+DIGITS = {word: n for word, n in NUMBERS.items() if n <= MAX_DIGIT}
 
-#for minesweeper
+# Word commands, all of them minesweeper's. "easy"/"hard" pick a difficulty;
+# like the MENU: path below, the host side is ready before the firmware emits
+# them, so nothing sends these two yet -- keep them.
 COMMANDS = {
     "RESET": "reset",
     "FLAG": "flag",
     "OPEN": "open",
     "NO": "no",
+    "EASY": "easy",
+    "HARD": "hard",
 }
-_KEYWORD_RE = re.compile(r"Command:\s*(\w+)")
+_COMMAND_RE = re.compile(r"Command:\s*(\w+)")
 _MENU_RE = re.compile(r"MENU:(\w+)")
 # Lines that only game_receiver's firmware ever prints, used to tell its
 # console apart from another DK's console when both are plugged in at once
@@ -276,7 +275,7 @@ class SerialController:
             if menu_match:
                 self.menu.put(menu_match.group(1).upper())
                 continue
-            match = _KEYWORD_RE.search(line)
+            match = _COMMAND_RE.search(line)
             if not match:
                 continue
             word = match.group(1)
@@ -290,8 +289,8 @@ class SerialController:
             # 2) Tall. Minesweeper reads them as ("number", n) off self.commands;
             #    the quiz reads 0-5 off self.digits. Post to both queues and let
             #    each game take from the one it uses -- drain() clears the rest.
-            if word in KEYWORDS:
-                self.commands.put(("number", KEYWORDS[word]))
+            if word in NUMBERS:
+                self.commands.put(("number", NUMBERS[word]))
                 if word in DIGITS:
                     self.digits.put(DIGITS[word])
                 continue
@@ -301,9 +300,20 @@ class SerialController:
                 self.commands.put(("command", COMMANDS[word]))
                 continue
 
-    def drain(self) -> None:
-        """Discard queued input, so stale events don't leak across screens."""
-        for q in (self.directions, self.digits, self.commands, self.menu):
+    def drain(self, menu: bool = True) -> None:
+        """Discard queued input, so stale events don't leak across screens.
+
+        @param menu  also discard queued menu-button tokens. Menu screens must
+                     pass False: those tokens are that screen's navigation, so
+                     draining them every frame throws the button press away
+                     before get_menu() ever sees it. Games pass the default, so
+                     a button pressed during play doesn't act on the game-over
+                     screen that follows.
+        """
+        queues = [self.directions, self.digits, self.commands]
+        if menu:
+            queues.append(self.menu)
+        for q in queues:
             while not q.empty():
                 q.get()
 
@@ -313,7 +323,7 @@ class SerialController:
             return self.menu.get_nowait()
         except queue.Empty:
             return None
-            
+
     def get_command(self, max_square: int | None = None):
     #returnerer samme format som minesweeper forventer
         try:
@@ -341,8 +351,10 @@ if __name__ == "__main__":
     controller.start()
     print(f"Listening on {controller.port} @ {baud} (Ctrl-C to stop)...")
     try:
-        # Poll both queues; either family of tokens can arrive, depending on
-        # which sender board is paired with the receiver.
+        # Poll every queue; which family of tokens arrives depends on the sender
+        # board paired with the receiver. Digits are also posted as ("number",
+        # n) commands, so a digit token prints on both lines -- that is the
+        # queue duplication in _run(), not a double read.
         while True:
             got = False
             while not controller.directions.empty():
@@ -351,6 +363,14 @@ if __name__ == "__main__":
                 got = True
             while not controller.digits.empty():
                 print(f"digit {controller.digits.get()}")
+                got = True
+            while not controller.commands.empty():
+                kind, value = controller.commands.get()
+                print(f"{kind} {value}")
+                got = True
+            token = controller.get_menu()
+            if token is not None:
+                print(f"menu {token}")
                 got = True
             if not got:
                 time.sleep(0.05)

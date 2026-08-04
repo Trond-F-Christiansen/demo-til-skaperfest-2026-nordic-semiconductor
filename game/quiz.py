@@ -32,12 +32,7 @@ from collections import namedtuple
 
 import pygame
 
-FONT_PATH = 'Font/PoetsenOne-Regular.ttf'
-FONT_PATH_HELVETICA = 'Font/Helvetica.ttf'
-
-BG_COLOR = "#34C3D5"
-TEXT_COLOR = (255, 255, 255)
-HILITE_BG = "#003C66"
+import ui
 
 # How many of QUESTIONS one run asks: they are drawn at random without repeats,
 # so consecutive runs differ. Raise or lower freely; a value at or above the pot
@@ -193,15 +188,15 @@ def _ask(screen, clock, controller, question, index, total, assets):
                     return selected
 
         # ---- draw ----
-        screen.fill(BG_COLOR)
+        screen.fill(ui.BG_COLOR)
 
         # Progress line, then the prompt, across the top.
-        progress = small_font.render(f"Question {index + 1} / {total}", True, TEXT_COLOR)
+        progress = small_font.render(f"Question {index + 1} / {total}", True, ui.TEXT_COLOR)
         screen.blit(progress, progress.get_rect(center=(cx, 50)))
 
         prompt_top = 110
         for i, line in enumerate(prompt_lines):
-            surf = prompt_font.render(line, True, TEXT_COLOR)
+            surf = prompt_font.render(line, True, ui.TEXT_COLOR)
             screen.blit(surf, surf.get_rect(center=(cx, prompt_top + i * line_h)))
 
         # Options stacked top -> down: text left-aligned, and the matching
@@ -220,7 +215,7 @@ def _ask(screen, clock, controller, question, index, total, assets):
             # Options come from questions.md and can be long ("en person som
             # ikke er interessert i politikk"), so squeeze any that would
             # otherwise run into the finger graphic on the right.
-            text_surf = option_font.render(text, True, TEXT_COLOR)
+            text_surf = option_font.render(text, True, ui.TEXT_COLOR)
             room = (img_rect.left - 24 if img_rect else right_x) - left_x
             if text_surf.get_width() > room:
                 scale = room / text_surf.get_width()
@@ -235,8 +230,8 @@ def _ask(screen, clock, controller, question, index, total, assets):
                 top = min(tops) - 12
                 box = pygame.Rect(left_x - 24, top,
                                   (right_x - left_x) + 48, max(bottoms) + 12 - top)
-                pygame.draw.rect(screen, HILITE_BG, box, border_radius=10)
-                pygame.draw.rect(screen, TEXT_COLOR, box, 3, border_radius=10)
+                pygame.draw.rect(screen, ui.HILITE_BG, box, border_radius=10)
+                pygame.draw.rect(screen, ui.TEXT_COLOR, box, 3, border_radius=10)
 
             screen.blit(text_surf, text_rect)
             if img:
@@ -244,7 +239,7 @@ def _ask(screen, clock, controller, question, index, total, assets):
 
         hint = hint_font.render(
             f"Show or press 1-{len(question.options)}    or    UP / DOWN + ENTER",
-            True, TEXT_COLOR)
+            True, ui.TEXT_COLOR)
         screen.blit(hint, hint.get_rect(center=(cx, height - 60)))
 
         pygame.display.update()
@@ -271,10 +266,10 @@ def run(screen, clock, controller):
             pygame.transform.smoothscale(img, (round(w * finger_h / h), finger_h)))
 
     assets = (
-        pygame.font.Font(FONT_PATH_HELVETICA, 40),  # prompt
-        pygame.font.Font(FONT_PATH_HELVETICA, 36),  # options
-        pygame.font.Font(FONT_PATH_HELVETICA, 24),  # hint
-        pygame.font.Font(FONT_PATH_HELVETICA, 28),  # progress
+        ui.font(40),   # prompt
+        ui.font(36),   # options
+        ui.font(24),   # hint
+        ui.font(28),   # progress
         finger_imgs,
     )
 

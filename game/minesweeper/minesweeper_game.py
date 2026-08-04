@@ -1,23 +1,74 @@
-import sys
-import time
+"""Minesweeper's game loop, played by voice through the shared controller.
+
+@ref run is the menu's entry point, under the same contract as snake.run and
+quiz.run: it owns its loop and returns the run's result, or None if the player
+closed the window (main.py treats None as "quit the app"). The result here is
+elapsed seconds -- lower is better -- which is why main.py labels minesweeper's
+result "Time" rather than "Score".
+
+The board has its own aspect ratio, so it is drawn at natural size into an
+off-screen surface and scaled into the window main.py owns. Changing difficulty
+therefore only changes those numbers; nothing here calls
+pygame.display.set_mode().
+
+Spoken input, read off controller.get_command():
+    <row> <column>      two numbers pick a square
+    open / flag         what the next picked square does
+    no                  forget a mis-heard row
+    reset (twice)       start over
+    easy / hard         swap difficulty between rounds
+Keyboard extras for laying out a board by hand: M enters setup mode, click to
+toggle mines, SPACE commits. ESC gives up and returns the time so far.
+"""
+
 import pygame
 
+import ui
+
 from .config import (
-    WIDTH, HEIGHT, LABEL_SIZE, NSQUARES, MARGIN, MENU_SIZE, LEFT_CLICK, RIGHT_CLICK, DIFFICULTIES, GREEN1
+    WIDTH, HEIGHT, MARGIN, MENU_SIZE, LABEL_SIZE, LEFT_CLICK, RIGHT_CLICK,
+    DIFFICULTIES, GREEN1
 )
 from .game import Game
 from .menu import Menu
 
+# Width reserved down the left of the window for the help box; the board is
+# centred in what is left.
+INFO_WIDTH = 280
+
+# Fraction of the available area the board fills, leaving a margin around it.
+BOARD_FILL = 0.9
+
+_HELP_LINES = [
+    ("Stemmestyring", True),
+    ("", False),
+    ("Si tall (rad og", False),
+    ("kolonne) for å", False),
+    ("velge en rute.", False),
+    ("", False),
+    ("'open' åpner ruten", False),
+    ("du har valgt.", False),
+    ("", False),
+    ("'flag' setter et", False),
+    ("flagg der du tror", False),
+    ("det er en mine.", False),
+    ("", False),
+    ("'no' angrer hvis", False),
+    ("du sa feil tall.", False),
+    ("", False),
+    ("'easy'/'hard' bytter", False),
+    ("vanskelighetsgrad.", False),
+]
 
 
 def handle_voice_input(game, state, controller):
-    keyword = controller.get_command(max_square=NSQUARES)
+    # Numbers name a row or column, so anything at or past the board edge is a
+    # mis-hear. The bound follows the board, which "easy"/"hard" can change.
+    keyword = controller.get_command(max_square=game.squares_x)
     if keyword is None:
         return
-    kind, result = keyword 
-    print(kind)
-    print(result)
-    
+    kind, result = keyword
+
     if kind=="command":
         if result=="reset":
             state["reset_count"]+=1
@@ -28,7 +79,6 @@ def handle_voice_input(game, state, controller):
                 state["mode"] = "open"
                 state["row"] = None
                 state["column"] = None
-                #game.setup_mode=True
 
             else:
                 print("Si reset en gang til for å resette")
@@ -46,33 +96,23 @@ def handle_voice_input(game, state, controller):
             state["mode"] = "open"
             state["row"] = None
             state["column"] = None
-        
+
         elif result=="no":
             state["reset_count"]=0
             state["row"] = None
 
-        elif result == "easy" and not game.in_progress():
+        # Difficulty only between rounds, so a losing board can't be swapped
+        # out mid-game. The loop picks up the new board size on the next frame.
+        elif result in DIFFICULTIES and not game.in_progress():
             state["reset_count"]=0
             game.setup_mode = False
-            size= DIFFICULTIES["easy"]["size"]
-            bombs=DIFFICULTIES["easy"]["bombs"]
-            screen = game.set_difficulty(size, bombs)
+            game.set_difficulty(DIFFICULTIES[result]["size"],
+                                DIFFICULTIES[result]["bombs"])
             state["row"] = None
             state["column"] = None
-            print("easy-mode")
-
-        elif result == "hard" and not game.in_progress():
-            state["reset_count"]=0
-            game.setup_mode = False
-            size= DIFFICULTIES["hard"]["size"]
-            bombs=DIFFICULTIES["hard"]["bombs"]
-            screen = game.set_difficulty(size, bombs)
-            state["row"] = None
-            state["column"] = None
-            print("hard-mode")
+            print(f"{result}-mode")
 
     elif kind=="number" and not game.setup_mode:
-        #state["reset_count"]=0
         if state["row"] is None:
             state["row"] = result
             print(state["row"])
@@ -87,35 +127,20 @@ def handle_voice_input(game, state, controller):
                 print("flagger")
             state["row"] = None
             state["column"] = None
-        
-def draw_info(screen, win_h):
+
+
+def draw_info(screen):
     """Tegn en hjelpetekst i en boks til venstre for brettet."""
-    title_font = pygame.font.Font('freesansbold.ttf', 26)
-    text_font = pygame.font.Font('freesansbold.ttf', 18)
+    title_font = ui.font(26)
+    text_font = ui.font(18)
 
-    lines = [
-        ("Stemmestyring", True),
-        ("", False),
-        ("Si tall (rad og", False),
-        ("kolonne) for å", False),
-        ("velge en rute.", False),
-        ("", False),
-        ("'open' åpner ruten", False),
-        ("du har valgt.", False),
-        ("", False),
-        ("'flag' setter et", False),
-        ("flagg der du tror", False),
-        ("det er en mine.", False),
-        ("", False),
-        ("'no' angrer hvis", False),
-        ("du sa feil tall.", False),
-    ]
-
-    # Boks-dimensjoner
     box_x = 15
     box_y = 90
     box_w = 250
-    box_h = 470
+    # Sized to the text rather than hardcoded, so lines can be added above.
+    box_h = 40 + sum(14 if not text else
+                     (title_font if is_title else text_font).get_height() + 6
+                     for text, is_title in _HELP_LINES)
 
     # Bakgrunn + ramme
     box = pygame.Rect(box_x, box_y, box_w, box_h)
@@ -125,7 +150,7 @@ def draw_info(screen, win_h):
     # Tekst
     x = box_x + 18
     y = box_y + 20
-    for text, is_title in lines:
+    for text, is_title in _HELP_LINES:
         if text == "":
             y += 14
             continue
@@ -135,48 +160,61 @@ def draw_info(screen, win_h):
         screen.blit(surf, (x, y))
         y += f.get_height() + 6
 
-def main(controller, screen):
-    best_seconds = 0
-    
-    board_size = (NSQUARES * (WIDTH + MARGIN) + MARGIN + LABEL_SIZE,
-                  NSQUARES * (HEIGHT + MARGIN) + MARGIN + MENU_SIZE + LABEL_SIZE)
-    board_surf = pygame.Surface(board_size)
+
+def _layout(screen, game):
+    """Board surface, and how big/where to blit it, for the current board size.
+
+    @return (board_surf, scaled_size, offset). Recomputed whenever the board
+            changes size, which is what makes difficulty switching work.
+    """
+    board_size = game.board_pixel_size()
     win_w, win_h = screen.get_size()
-    info_width = 280                                   # plass til infoboks til venstre
-    avail_w = win_w - info_width
-    scale = min(avail_w / board_size[0], win_h / board_size[1]) * 0.9
+    avail_w = win_w - INFO_WIDTH
+    scale = min(avail_w / board_size[0], win_h / board_size[1]) * BOARD_FILL
     scaled_size = (int(board_size[0] * scale), int(board_size[1] * scale))
     # sentrer brettet i omradet TIL HOYRE for infoboksen
-    offset_x = info_width + (avail_w - scaled_size[0]) // 2
-    offset_y = (win_h - scaled_size[1]) // 2
+    offset = (INFO_WIDTH + (avail_w - scaled_size[0]) // 2,
+              (win_h - scaled_size[1]) // 2)
+    return pygame.Surface(board_size), scaled_size, offset
 
-    font = pygame.font.Font('freesansbold.ttf', 24)
+
+def run(screen, clock, controller):
+    """Play one round; see the module docstring for the return value."""
+    font = ui.font(24)
 
     game = Game()
-    game.player_name="Anonym"
-    menu = Menu(board_surf)
-    clock = pygame.time.Clock()
+    menu = Menu()
+    board_surf, scaled_size, offset = _layout(screen, game)
 
-    game_active = True #false før: endrer for å flette med aslak sin kode
-    state = {"row": None, "column": None, "mode": "open" , "reset_count" : 0}
+    state = {"row": None, "column": None, "mode": "open", "reset_count": 0}
+
+    # Drop anything queued while the menu was up, so a stale number doesn't
+    # open a square the moment the board appears.
+    controller.drain()
+
+    def blit_board():
+        screen.blit(pygame.transform.smoothscale(board_surf, scaled_size), offset)
 
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return best_seconds
+                return None            # window closed -> main.py quits the app
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if game.setup_mode:
-                    x, y = event.pos
-                    r= (y - MARGIN - MENU_SIZE - LABEL_SIZE) // (HEIGHT + MARGIN) #må regne pos på brettet
-                    c= (x - MARGIN - LABEL_SIZE) // (WIDTH + MARGIN)#må regne pos på brettet
-                    if r >= 0 and r < game.squares_y:
-                        if c >= 0 and c < game.squares_x:
-                            cell = game.grid[r][c]
-                            cell.has_bomb = not cell.has_bomb #bombe hvis uten bombe, ikke bombe hvis det er en bombe der allerede
+                    # Window coordinates -> board coordinates: undo the blit
+                    # offset and the scaling, then the board's own margins.
+                    x = (event.pos[0] - offset[0]) * board_surf.get_width() / scaled_size[0]
+                    y = (event.pos[1] - offset[1]) * board_surf.get_height() / scaled_size[1]
+                    r = int(y - MARGIN - MENU_SIZE - LABEL_SIZE) // (HEIGHT + MARGIN)
+                    c = int(x - MARGIN - LABEL_SIZE) // (WIDTH + MARGIN)
+                    if 0 <= r < game.squares_y and 0 <= c < game.squares_x:
+                        cell = game.grid[r][c]
+                        #bombe hvis uten bombe, ikke bombe hvis det er en bombe der allerede
+                        cell.has_bomb = not cell.has_bomb
 
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:     
-                    return best_seconds
+                if event.key == pygame.K_ESCAPE:
+                    return game.get_elapsed_time()   # gir opp
                 elif event.key == pygame.K_m:
                     game.setup_mode=True
                     game.reset_game()
@@ -191,28 +229,26 @@ def main(controller, screen):
                                 count+=1
                     game.num_bombs=count
                     game.init=True #hopper over utplassering av bomber
-                    #game.start_time = pygame.time.get_ticks()
 
-        screen.fill(GREEN1)
-        draw_info(screen, win_h)                      
-        game.draw(board_surf, font, state)
         handle_voice_input(game, state, controller)
 
-        if game.game_won or game.game_lost:
-            best_seconds = game.get_elapsed_time()
-            if game.game_won:                                   
-                controller.send_score("minesweeper", best_seconds)
-            game.draw(board_surf, font, state)
-            menu.draw(board_surf, font, game, state["mode"])
-            scaled = pygame.transform.smoothscale(board_surf, scaled_size)
-            screen.blit(scaled, (offset_x, offset_y))
-            pygame.display.flip()
-            pygame.time.delay(1500)
-            return best_seconds
+        # set_difficulty() may have swapped in a different board.
+        if board_surf.get_size() != game.board_pixel_size():
+            board_surf, scaled_size, offset = _layout(screen, game)
 
+        screen.fill(GREEN1)
+        draw_info(screen)
+        game.draw(board_surf, font, state)
         menu.draw(board_surf, font, game, state["mode"])
-        scaled = pygame.transform.smoothscale(board_surf, scaled_size)
-        screen.blit(scaled, (offset_x, offset_y))
+        blit_board()
+
+        if game.game_won or game.game_lost:
+            seconds = game.get_elapsed_time()
+            if game.game_won:
+                controller.send_score("minesweeper", seconds)
+            pygame.display.flip()
+            pygame.time.delay(1500)   # la spilleren se resultatet
+            return seconds
+
         clock.tick(60)
         pygame.display.flip()
-

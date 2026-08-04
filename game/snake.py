@@ -16,8 +16,12 @@ Todo:
     - hard: walls? apple moves after x amount of time?
 """
 
+import random
+
 import pygame
 from pygame.math import Vector2
+
+import ui
 
 # Grid geometry. Window is cell_number * cell_size on each side (1000 x 1000),
 # which main.py uses to size the shared window.
@@ -223,10 +227,6 @@ class MAIN:
         pygame.draw.rect(screen, (56, 64, 12), bg_rect, 2)
 
 
-# random is only needed by FRUIT; import at module scope like the original.
-import random
-
-
 def run(shared_screen, clock, controller):
     """Play one round of snake on the shared window.
 
@@ -242,12 +242,11 @@ def run(shared_screen, clock, controller):
 
     apple = pygame.image.load('Graphics/nod.png').convert_alpha()
     apple = pygame.transform.scale(apple, (cell_size, cell_size))
-    game_font = pygame.font.Font('Font/PoetsenOne-Regular.ttf', 25)
+    game_font = ui.font(25, ui.FONT_DISPLAY)
 
-    # Drop any swipes that piled up in the menu so the snake doesn't lurch off
-    # on a stale direction the instant the game starts.
-    while not controller.directions.empty():
-        controller.directions.get()
+    # Drop anything that piled up in the menu so the snake doesn't lurch off on
+    # a stale direction the instant the game starts.
+    controller.drain()
 
     main_game = MAIN(controller)
     pygame.time.set_timer(SCREEN_UPDATE, TICK_MS)
