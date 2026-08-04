@@ -22,9 +22,7 @@ LABEL_SIZE = 30   # plass til tall langs kantene
 LEFT_CLICK = 1
 RIGHT_CLICK = 3
 
-# Serial
-SERIAL_PORT = '/dev/ttyACM3' # '/dev/serial/by-id/usb-SEGGER_J-Link_001051859487-if00' før
-BAUDRATE = 115200
+
 
 #vansklighetsgrader
 DIFFICULTIES = {

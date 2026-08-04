@@ -303,7 +303,7 @@ class SerialController:
 
     def drain(self) -> None:
         """Discard queued input, so stale events don't leak across screens."""
-        for q in (self.directions, self.digits, self.commands, self.menu):
+        for q in (self.directions, self.digits, self.commands):
             while not q.empty():
                 q.get()
 
