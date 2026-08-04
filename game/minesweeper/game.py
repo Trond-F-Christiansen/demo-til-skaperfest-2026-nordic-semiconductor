@@ -1,4 +1,8 @@
 #lånt fra nettet
+#
+# The board is pure model plus a draw() that renders onto whatever surface it
+# is handed. It never touches pygame.display: main.py owns the window, and
+# minesweeper_game.py scales this board into it (see ui.py).
 
 from random import randrange
 import pygame
@@ -19,19 +23,23 @@ class Game:
         self.num_bombs = NUM_BOMBS
         self.squares_x = NSQUARES
         self.squares_y = NSQUARES
-        self.resize = False
         self.flag_count = 0
         self.start_time=None
         self.end_time=None
         self.setup_mode = False
-        self.player_name = "Anonym"
 
-    
+
     def in_progress(self):
-        if self.init:
-            if not self.game_lost and not self.game_lost:
-                return True
-        return False
+        return self.init and not self.game_lost and not self.game_won
+
+    def board_pixel_size(self):
+        """Size of the surface draw() needs for the current board, in pixels.
+
+        Changes with the board, so minesweeper_game.py recomputes its scaling
+        from this rather than from NSQUARES.
+        """
+        return (self.squares_x * (WIDTH + MARGIN) + MARGIN + LABEL_SIZE,
+                self.squares_y * (HEIGHT + MARGIN) + MARGIN + MENU_SIZE + LABEL_SIZE)
 
     def get_elapsed_time(self):
         if self.start_time==None:
@@ -40,9 +48,13 @@ class Game:
             return (pygame.time.get_ticks()-self.start_time)//1000
         else:
             return (self.end_time-self.start_time)//1000
-        
+
     def set_difficulty(self, size, bombs):
-        """Bytt brettstørrelse og antall bomber, og start på nytt."""
+        """Bytt brettstørrelse og antall bomber, og start på nytt.
+
+        Only the model changes; the caller notices the new
+        @ref board_pixel_size and resizes its own surface.
+        """
         self.squares_x = size
         self.squares_y = size
         self.num_bombs = bombs
@@ -50,9 +62,6 @@ class Game:
         self.grid = [[self.Cell(x, y) for x in range(size)]
                     for y in range(size)]
         self.reset_game()
-        new_size = (size * (WIDTH + MARGIN) + MARGIN + LABEL_SIZE,
-            size * (HEIGHT + MARGIN) + MARGIN + MENU_SIZE + LABEL_SIZE)
-        return pygame.display.set_mode(new_size, pygame.RESIZABLE)
 
     def draw(self, screen, font, state=None):
             screen.fill(GREEN1)
@@ -64,8 +73,6 @@ class Game:
                         color = RED if self.grid[row][column].has_bomb else GRAY
                     elif self.grid[row][column].has_flag:
                         color = RED1
-                    #if state["row"]==row and state["column"]==None:
-                        #color = HIGHLIGHT
                     if self.setup_mode and self.grid[row][column].has_bomb:
                         color = RED1
                     pygame.draw.rect(screen, color,
@@ -97,35 +104,12 @@ class Game:
                             (MARGIN + LABEL_SIZE,
                             (MARGIN + HEIGHT) * sel_row + MARGIN + MENU_SIZE + LABEL_SIZE))
 
-    def adjust_grid(self, sizex, sizey):
-        self.squares_x = (sizex - MARGIN) // (WIDTH + MARGIN)
-        self.squares_y = (sizey - MARGIN - MENU_SIZE) // (HEIGHT + MARGIN)
-        if self.squares_x < 8:
-            self.squares_x = 8
-        if self.squares_y < 8:
-            self.squares_y = 8
-        if self.num_bombs > (self.squares_x * self.squares_y) // 3:
-            self.num_bombs = self.squares_x * self.squares_y // 3
-        self.grid = [[self.Cell(x, y) for x in range(self.squares_x)]
-                     for y in range(self.squares_y)]
-        size = ((self.squares_x * (WIDTH + MARGIN) + MARGIN),
-                (self.squares_y * (HEIGHT + MARGIN) + MARGIN + MENU_SIZE))
-        return pygame.display.set_mode(size, pygame.RESIZABLE)
-
     def game_over(self):
         for row in range(self.squares_y):
             for column in range(self.squares_x):
                 if self.grid[row][column].has_bomb:
                     self.grid[row][column].is_visible = True
                 self.grid[row][column].has_flag = False
-
-    def change_num_bombs(self, bombs):
-        self.num_bombs += bombs
-        if self.num_bombs < 1:
-            self.num_bombs = 1
-        elif self.num_bombs > (self.squares_x * self.squares_y) // 3:
-            self.num_bombs = self.squares_x * self.squares_y // 3
-        self.reset_game()
 
     def place_bombs(self, row, column):
         bombplaced = 0
