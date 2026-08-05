@@ -70,7 +70,7 @@ static const class_prediction_condition_t *get_class_condition(uint8_t predicted
 		//[CLASS_LABEL_DOUBLE_THUMB]   = {3, 0.9},
 		//[CLASS_LABEL_ROTATION_RIGHT] = {2, 0.7},
 		//[CLASS_LABEL_ROTATION_LEFT]  = {2, 0.7},
-		[CLASS_LABEL_SWIPE_DOWN]	 ={1, 0.8},
+		[CLASS_LABEL_SWIPE_DOWN]	 ={1, 0.7},
 	};
 
 	static const uint8_t LABELS_CNT = ARRAY_SIZE(LABEL_VS_CONFIG);

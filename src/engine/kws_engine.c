@@ -146,7 +146,7 @@ static void kws_engine_run(atomic_t *stop)
 }
 
 const engine_t kws_engine = {
-	.name = "KWS",
+	.name = ENGINE_NAME_KWS,
 	.init = kws_engine_init,
 	.enter = kws_engine_enter,
 	.exit = kws_engine_exit,

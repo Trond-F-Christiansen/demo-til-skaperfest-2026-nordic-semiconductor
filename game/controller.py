@@ -78,12 +78,19 @@ _RECEIVER_SIGNATURE_RE = re.compile(
     r"Command:|Scanning for a game controller"
 )
 
-# J-Link serial number of the DK that's actually running game_receiver.
-# Checked before anything else, since it's deterministic (unlike probing,
-# which needs the board to log something during the probe window). Update
-# this if game_receiver ever gets flashed onto a different physical DK; get
-# the serial with `nrfjprog --ids` or `nrfutil device list`.
-_KNOWN_RECEIVER_SERIAL = "001051849885"
+# J-Link serial numbers of DKs known to run game_receiver. Checked before
+# anything else, since it is deterministic -- unlike probing, which only works
+# if the board happens to log something during the 2s window, and the receiver
+# stays quiet until a peripheral actually sends a command.
+#
+# Add an entry when game_receiver is flashed onto another DK; list the serials
+# of what is connected with `nrfutil device list` (or `nrfjprog --ids`), or:
+#     python -c "from serial.tools import list_ports; \
+#                print([(p.device, p.serial_number) for p in list_ports.comports()])"
+_KNOWN_RECEIVER_SERIALS = {
+    "001051874813",
+    "001051849885",
+}
 
 # USB vendor IDs of the debug probes used on Nordic DKs (SEGGER J-Link OB,
 # Nordic Semiconductor), used to pick out candidate ports.
@@ -160,8 +167,8 @@ def find_controller_port(baudrate: int = 115200) -> str | None:
 
     The J-Link's console VCOM is always at USB interface @ref
     _CONSOLE_USB_INTERFACE, regardless of how Linux numbers the ttyACMx
-    devices. If @ref _KNOWN_RECEIVER_SERIAL is plugged in, its port wins
-    immediately. Otherwise, if more than one board's console matches (e.g. a
+    devices. If a board from @ref _KNOWN_RECEIVER_SERIALS is plugged in, its
+    port wins immediately. Otherwise, if more than one board's console matches (e.g. a
     second DK is plugged in for testing another app), each tied candidate is
     probed briefly and the one actually printing game_receiver's log lines
     wins. Falls back to the highest-ranked candidate if the interface cannot
@@ -178,7 +185,7 @@ def find_controller_port(baudrate: int = 115200) -> str | None:
     ]
 
     for p in ports:
-        if p.serial_number == _KNOWN_RECEIVER_SERIAL:
+        if p.serial_number in _KNOWN_RECEIVER_SERIALS:
             return p.device
 
     tied = [p.device for p in ports]

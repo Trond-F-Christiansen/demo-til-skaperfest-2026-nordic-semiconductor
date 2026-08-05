@@ -29,6 +29,22 @@
 extern "C" {
 #endif /* __cplusplus */
 
+/**
+ * @name Engine names
+ *
+ * The name each engine registers in its @ref engine_t, and the string
+ * @ref engine_request_select matches against. Defined here so a caller
+ * selecting an engine and the engine itself cannot drift apart.
+ * @{
+ */
+/** Keyword spotting for snake: swipe directions spoken out loud. */
+#define ENGINE_NAME_KWS      "KWS"
+/** Keyword spotting for minesweeper: numbers, "open", "flag", "reset". */
+#define ENGINE_NAME_KWS_MINE "KWS_MINE"
+/** Gesture recognition for snake: swipe directions over the IMU. */
+#define ENGINE_NAME_GESTURE  "Gesture"
+/** @} */
+
 typedef struct engine {
 	/** Human-readable engine name, for logging. */
 	const char *name;
