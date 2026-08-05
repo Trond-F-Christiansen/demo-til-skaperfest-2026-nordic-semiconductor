@@ -81,7 +81,7 @@ GAMES = [
 ]
 
 
-def choose(screen, clock, controller, title, options, subtitle=None):
+def choose(screen, clock, controller, title, options, subtitle=None, button_map=None):
     """Render a vertical menu and return the chosen option index.
 
     @param options   list of label strings, drawn top to bottom.
@@ -98,8 +98,12 @@ def choose(screen, clock, controller, title, options, subtitle=None):
 
     # Buttons address options by position; a screen with more options than
     # buttons simply leaves the rest keyboard-only.
-    button_map = {token: i for i, token in enumerate(BUTTON_TOKENS[:len(options)])}
-    hint = "    ".join(f"BTN{i}: {options[i]}" for i in range(len(button_map)))
+    if button_map is None:
+        button_map = {token: i for i, token in enumerate(BUTTON_TOKENS[:len(options)])}
+    hint = "    ".join(
+        f"BTN{BUTTON_TOKENS.index(t)}: {options[i]}"
+        for t, i in sorted(button_map.items(), key=lambda ti: BUTTON_TOKENS.index(ti[0]))
+    )
 
     selected = 0
     cx = WINDOW_SIZE[0] // 2
@@ -174,11 +178,19 @@ def run_app(screen, clock, controller):
             if result is None:  # window closed mid-game -> quit app
                 return
 
+            if game.name.upper() == "MINESWEEPER":
+                # Minesweeper runs on KWS_MINE (BTN2), so Restart must reuse
+                # BTN2 to keep the right model loaded. Main Menu on BTN0.
+                button_map = {"MINESWEEPER": 0, "SNAKE": 1}
+            else:
+                # Snake and Quiz both run on KWS; keep Restart on BTN0.
+                button_map = {"SNAKE": 0, "QUIZ": 1}
             action = choose(
                 screen, clock, controller,
                 "Game Over",
                 ["Restart", "Main Menu"],
                 subtitle=f"{game.name}    {game.result_text(result)}",
+                button_map=button_map,
             )
             if action is None:      # quit
                 return

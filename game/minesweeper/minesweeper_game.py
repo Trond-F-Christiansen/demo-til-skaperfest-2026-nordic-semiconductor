@@ -22,7 +22,6 @@ toggle mines, SPACE commits. ESC gives up and returns the time so far.
 """
 
 import pygame
-
 import ui
 
 from .config import (
@@ -46,18 +45,16 @@ _HELP_LINES = [
     ("kolonne) for å", False),
     ("velge en rute.", False),
     ("", False),
-    ("'open' åpner ruten", False),
+    ("'mark' åpner ruten", False),
     ("du har valgt.", False),
     ("", False),
-    ("'flag' setter et", False),
+    ("'bomb' setter et", False),
     ("flagg der du tror", False),
     ("det er en mine.", False),
     ("", False),
     ("'no' angrer hvis", False),
     ("du sa feil tall.", False),
     ("", False),
-    ("'easy'/'hard' bytter", False),
-    ("vanskelighetsgrad.", False),
 ]
 
 

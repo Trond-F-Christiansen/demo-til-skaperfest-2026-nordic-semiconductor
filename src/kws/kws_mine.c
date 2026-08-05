@@ -13,7 +13,7 @@
 
 #include "dmic.h"
 #include "kws_mine.h"
-#include "Minesweeper_94292_kws_generated/nrf_edgeai_user_model.h"
+#include "Minesweeper2_95233_kws/nrf_edgeai_user_model.h"
 
 LOG_MODULE_REGISTER(kws_mine);
 
@@ -26,21 +26,21 @@ LOG_MODULE_REGISTER(kws_mine);
  * three, two, zero
  */
 enum mine_class {
-	MINE_OTHER,
-	MINE_SILENCE,
-	MINE_FIVE,
-	MINE_FLAG,
-	MINE_FOUR,
-	MINE_NO,
-	MINE_ONE,
-	MINE_OPEN,
-	MINE_RESET,
-	MINE_SEVEN,
-	MINE_SIX,
-	MINE_THREE,
-	MINE_TWO,
-	MINE_ZERO,
-	MINE_COUNT
+    MINE_OTHER,
+    MINE_SILENCE,
+    MINE_BOMB,
+    MINE_FIVE,
+    MINE_FOUR,
+    MINE_MARK,
+    MINE_NO,
+    MINE_ONE,
+    MINE_RESET,
+    MINE_SEVEN,
+    MINE_SIX,
+    MINE_THREE,
+    MINE_TWO,
+    MINE_ZERO,
+    MINE_COUNT
 };
 
 struct mine_detection_ctx {
@@ -54,20 +54,20 @@ struct mine_detection_ctx {
  * The rest map to the uppercase tokens the Minesweeper Python expects.
  */
 static const struct mine_detection_ctx mine_ctxs[] = {
-	[MINE_OTHER]   = {.name = "OTHER",   .token = NULL,        .threshold = 0.99f, .num_in_row = 22},
-	[MINE_SILENCE] = {.name = "SILENCE", .token = NULL,        .threshold = 0.99f, .num_in_row = 22},
-	[MINE_FIVE]    = {.name = "five",    .token = "FIVE\r\n",  .threshold = 0.3f,  .num_in_row = 5},
-	[MINE_FLAG]    = {.name = "flag",    .token = "FLAG\r\n",  .threshold = 0.3f,  .num_in_row = 5},
-	[MINE_FOUR]    = {.name = "four",    .token = "FOUR\r\n",  .threshold = 0.3f,  .num_in_row = 5},
-	[MINE_NO]      = {.name = "no",      .token = "NO\r\n",    .threshold = 0.3f,  .num_in_row = 5},
-	[MINE_ONE]     = {.name = "one",     .token = "ONE\r\n",   .threshold = 0.3f,  .num_in_row = 5},
-	[MINE_OPEN]    = {.name = "open",    .token = "OPEN\r\n",  .threshold = 0.2f,  .num_in_row = 4},
-	[MINE_RESET]   = {.name = "reset",   .token = "RESET\r\n", .threshold = 0.3f,  .num_in_row = 5},
-	[MINE_SEVEN]   = {.name = "seven",   .token = "SEVEN\r\n", .threshold = 0.3f,  .num_in_row = 5},
-	[MINE_SIX]     = {.name = "six",     .token = "SIX\r\n",   .threshold = 0.3f,  .num_in_row = 5},
-	[MINE_THREE]   = {.name = "three",   .token = "THREE\r\n", .threshold = 0.2f,  .num_in_row = 4},
-	[MINE_TWO]     = {.name = "two",     .token = "TWO\r\n",   .threshold = 0.3f,  .num_in_row = 5},
-	[MINE_ZERO]    = {.name = "zero",    .token = "ZERO\r\n",  .threshold = 0.3f,  .num_in_row = 5},
+    [MINE_OTHER]   = {.name = "OTHER",   .token = NULL,        .threshold = 0.99f, .num_in_row = 22},
+    [MINE_SILENCE] = {.name = "SILENCE", .token = NULL,        .threshold = 0.99f, .num_in_row = 22},
+    [MINE_BOMB]    = {.name = "bomb",    .token = "BOMB\r\n",  .threshold = 0.2f,  .num_in_row = 5},
+    [MINE_FIVE]    = {.name = "five",    .token = "FIVE\r\n",  .threshold = 0.3f,  .num_in_row = 5},
+    [MINE_FOUR]    = {.name = "four",    .token = "FOUR\r\n",  .threshold = 0.3f,  .num_in_row = 5},
+    [MINE_MARK]    = {.name = "mark",    .token = "MARK\r\n",  .threshold = 0.31,  .num_in_row = 5},
+    [MINE_NO]      = {.name = "no",      .token = "NO\r\n",    .threshold = 0.3f,  .num_in_row = 5},
+    [MINE_ONE]     = {.name = "one",     .token = "ONE\r\n",   .threshold = 0.3f,  .num_in_row = 5},
+    [MINE_RESET]   = {.name = "reset",   .token = "RESET\r\n", .threshold = 0.3f,  .num_in_row = 5},
+    [MINE_SEVEN]   = {.name = "seven",   .token = "SEVEN\r\n", .threshold = 0.3f,  .num_in_row = 5},
+    [MINE_SIX]     = {.name = "six",     .token = "SIX\r\n",   .threshold = 0.3f,  .num_in_row = 5},
+    [MINE_THREE]   = {.name = "three",   .token = "THREE\r\n", .threshold = 0.4f,  .num_in_row = 6},
+    [MINE_TWO]     = {.name = "two",     .token = "TWO\r\n",   .threshold = 0.3f,  .num_in_row = 5},
+    [MINE_ZERO]    = {.name = "zero",    .token = "ZERO\r\n",  .threshold = 0.3f,  .num_in_row = 5},
 };
 
 BUILD_ASSERT(MINE_COUNT == ARRAY_SIZE(mine_ctxs),
@@ -77,7 +77,7 @@ static nrf_edgeai_t *mine_model;
 
 int kws_mine_init(void)
 {
-	mine_model = nrf_edgeai_user_model_94292();
+	mine_model = nrf_edgeai_user_model_95233();
 	__ASSERT_NO_MSG(mine_model);
 	__ASSERT_NO_MSG(nrf_edgeai_model_outputs_num(mine_model) == MINE_COUNT);
 	__ASSERT_NO_MSG(nrf_edgeai_input_window_size(mine_model) == DMIC_SAMPLES_IN_BLOCK);

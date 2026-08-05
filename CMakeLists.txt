@@ -23,7 +23,7 @@ target_sources(app PRIVATE
   src/kws/Snake_94502_kws/nrf_edgeai_generated/nrf_edgeai_user_model.c
 
   src/kws/kws_mine.c
-  src/kws/Minesweeper_94292_kws_generated/nrf_edgeai_user_model.c
+  src/kws/Minesweeper2_95233_kws/nrf_edgeai_user_model.c
   src/engine/kws_mine_engine.c
 )
 

@@ -1,5 +1,4 @@
 """Minesweeper's own constants: board geometry and gameplay colours.
-
 No serial settings live here. Port selection and baud rate belong to
 controller.py alone, which autodetects the DK -- minesweeper gets its input
 from the shared SerialController like snake and quiz do.
@@ -20,7 +19,7 @@ HIGHLIGHT = (255, 230, 120)   # gul markering for valgt rad
 WIDTH = 30
 HEIGHT = 30
 NSQUARES = 8
-NUM_BOMBS = 6
+NUM_BOMBS = 3
 MARGIN = 11
 MENU_SIZE = 70
 LABEL_SIZE = 30   # plass til tall langs kantene
