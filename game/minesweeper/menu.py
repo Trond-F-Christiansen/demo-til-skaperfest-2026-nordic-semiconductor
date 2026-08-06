@@ -36,7 +36,7 @@ class Menu:
                 self.label_time.show(screen, ui.font(16),
                                      "Time: " + str(game.get_elapsed_time()))
                 self.label_flags.show(screen, ui.font(16),
-                                      "Mines: " + str(game.num_bombs - game.flag_count))
+                                      "Mines: " + str(game.num_bombs))
                 if mode == "flag":
                     self.label_mode.show(screen, ui.font(16), "Flag-mode")
                 elif mode == "open":

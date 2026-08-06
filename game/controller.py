@@ -61,8 +61,8 @@ DIGITS = {word: n for word, n in NUMBERS.items() if n <= MAX_DIGIT}
 # them, so nothing sends these two yet -- keep them.
 COMMANDS = {
     "RESET": "reset",
-    "FLAG": "flag",
-    "OPEN": "open",
+    "BOMB": "flag",
+    "MARK": "open",
     "NO": "no",
     "EASY": "easy",
     "HARD": "hard",

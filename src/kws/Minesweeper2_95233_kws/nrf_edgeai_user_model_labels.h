@@ -1,4 +1,4 @@
-/* 2026-07-06T12:26:35.758861 */
+/* 2026-08-04T13:11:15.373692 */
 
 /*
 * Copyright (c) 2026 Nordic Semiconductor ASA
@@ -18,12 +18,12 @@ extern "C"
 typedef enum nrf_edgeai_user_label_e {
     MODEL_LABEL_INDEX_OTHER,
     MODEL_LABEL_INDEX_SILENCE,
+    MODEL_LABEL_INDEX_BOMB,
     MODEL_LABEL_INDEX_FIVE,
-    MODEL_LABEL_INDEX_FLAG,
     MODEL_LABEL_INDEX_FOUR,
+    MODEL_LABEL_INDEX_MARK,
     MODEL_LABEL_INDEX_NO,
     MODEL_LABEL_INDEX_ONE,
-    MODEL_LABEL_INDEX_OPEN,
     MODEL_LABEL_INDEX_RESET,
     MODEL_LABEL_INDEX_SEVEN,
     MODEL_LABEL_INDEX_SIX,
@@ -33,7 +33,7 @@ typedef enum nrf_edgeai_user_label_e {
 } nrf_edgeai_user_label_t;
 
 static const char* NRF_EDGEAI_USER_LABELS_NAME[] = {
-    "OTHER", "SILENCE", "five", "flag", "four", "no", "one", "open", "reset", "seven", "six", "three", "two", "zero"
+    "OTHER", "SILENCE", "bomb", "five", "four", "mark", "no", "one", "reset", "seven", "six", "three", "two", "zero"
 };
 
 #ifdef   __cplusplus
