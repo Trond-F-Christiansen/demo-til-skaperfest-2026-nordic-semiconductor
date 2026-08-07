@@ -30,7 +30,7 @@ cell_number = 18
 screen_color = (175, 215, 70)
 
 # How often the snake advances, in milliseconds.
-TICK_MS = 300
+TICK_MS = 00
 
 # Custom event used to drive the fixed-rate game tick.
 SCREEN_UPDATE = pygame.USEREVENT
