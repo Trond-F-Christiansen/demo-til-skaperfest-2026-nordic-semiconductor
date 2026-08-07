@@ -65,10 +65,15 @@ static void nus_connected(struct bt_conn *conn, uint8_t err)
 	LOG_INF("Connected %s", addr);
 }
 
+static int advertising_start(void)
+{
+	return bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, nus_ad, ARRAY_SIZE(nus_ad),
+			       nus_sd, ARRAY_SIZE(nus_sd));
+}
+
 static void nus_disconnected(struct bt_conn *conn, uint8_t reason)
 {
 	char addr[BT_ADDR_LE_STR_LEN];
-	int err;
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 	LOG_INF("Disconnected from %s (reason 0x%02x)", addr, reason);
@@ -80,11 +85,30 @@ static void nus_disconnected(struct bt_conn *conn, uint8_t reason)
 
 	nus_send_enabled = false;
 
-	err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, nus_ad, ARRAY_SIZE(nus_ad),
-			      nus_sd, ARRAY_SIZE(nus_sd));
+	/* Advertising is deliberately NOT restarted here. This callback runs while
+	 * the connection object still exists, and with CONFIG_BT_MAX_CONN at its
+	 * default of 1 there is then no free object for a connectable advertiser to
+	 * reserve -- bt_le_adv_start() fails with -ENOMEM every time, leaving the
+	 * board silent until it is reset. It is restarted from nus_recycled()
+	 * instead, once the stack has released the connection.
+	 */
+}
+
+/* Fires once the disconnected connection object has been fully released, which
+ * is the first moment a connectable advertiser can be started again. Zephyr
+ * documents this as the event to listen for when restarting a connectable
+ * advertiser after an earlier connection.
+ */
+static void nus_recycled(void)
+{
+	int err = advertising_start();
+
 	if (err) {
 		LOG_ERR("Advertising failed to restart (err %d)", err);
+		return;
 	}
+
+	LOG_INF("Advertising restarted");
 }
 
 static struct bt_nus_cb nus_cb = {
@@ -94,6 +118,7 @@ static struct bt_nus_cb nus_cb = {
 static struct bt_conn_cb nus_conn_callbacks = {
 	.connected = nus_connected,
 	.disconnected = nus_disconnected,
+	.recycled = nus_recycled,
 };
 
 int ble_nus_init(void)
@@ -116,8 +141,7 @@ int ble_nus_init(void)
 
 	bt_conn_cb_register(&nus_conn_callbacks);
 
-	err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, nus_ad, ARRAY_SIZE(nus_ad),
-			      nus_sd, ARRAY_SIZE(nus_sd));
+	err = advertising_start();
 	if (err) {
 		LOG_ERR("Advertising failed to start (err %d)", err);
 		return err;
