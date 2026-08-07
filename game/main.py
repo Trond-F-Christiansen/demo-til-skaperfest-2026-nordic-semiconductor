@@ -264,6 +264,152 @@ def show_result(screen, clock, controller, game, result):
 
         pygame.display.update()
         clock.tick(60)
+# The four DK buttons in their physical 2x2 layout. Each entry is the button
+# label, the two text lines under it, and the menu token it selects (None = the
+# button does nothing on this screen). Order is row-major: top-left, top-right,
+# bottom-left, bottom-right -- matching the board's BTN0/1 over BTN2/3.
+
+
+MENU_GRID = [
+    ("BTN0", "Snake", "(stemme)", "SNAKE"),
+    ("BTN1", "Snake", "(bevegelse)", "SNAKE"),
+    ("BTN2", "Minesveiper", "", "MINESWEEPER"),
+    ("BTN3", "", "", None),
+]
+
+
+def _draw_button(screen, rect, label, selected, enabled, btn_font):
+    """Draw one DK-style push button: a light keycap with a round cap on top."""
+    # Colours chosen to read like the real board's white tactile switches.
+    base = (235, 235, 235) if enabled else (90, 90, 90)
+    cap = (250, 250, 250) if enabled else (110, 110, 110)
+    edge = (40, 40, 40)
+    ring = ui.TEXT_COLOR if selected else edge
+
+    # Square keycap base with a subtle border.
+    pygame.draw.rect(screen, base, rect, border_radius=10)
+    pygame.draw.rect(screen, ring, rect, 5 if selected else 3, border_radius=10)
+
+    # Round pressable cap in the middle.
+    cx, cy = rect.center
+    r = min(rect.width, rect.height) // 3
+    pygame.draw.circle(screen, cap, (cx, cy), r)
+    pygame.draw.circle(screen, edge, (cx, cy), r, 3)
+
+    # Button name on the cap.
+    label_color = (30, 30, 30) if enabled else (150, 150, 150)
+    surf = btn_font.render(label, True, label_color)
+    screen.blit(surf, surf.get_rect(center=(cx, cy)))
+
+def _draw_dk_board(screen, board_rect):
+    """Draw the top half of a stylised DK board (the bottom runs off-screen)."""
+    # PCB-plate (Nordic-aktig mørk blå), med en lysere kant rundt.
+    pygame.draw.rect(screen, (10, 26, 48), board_rect.inflate(12, 12),
+                     border_radius=22)
+    pygame.draw.rect(screen, (18, 42, 74), board_rect, border_radius=18)
+
+    # Skruehull i de to øvre hjørnene (de nedre er utenfor skjermen).
+    for corner in (board_rect.topleft, board_rect.topright):
+        ox = 18 if corner[0] == board_rect.left else -18
+        pygame.draw.circle(screen, (8, 20, 38), (corner[0] + ox, corner[1] + 18), 8)
+
+def main_menu(screen, clock, controller, token_map):
+    """Child-friendly main menu: a picture of the DK with its buttons.
+
+    The board is drawn with a mic on top and a USB cable below. The four
+    tactile switches sit in their real spot -- a 2x2 block in the top-right
+    corner (BTN0/1 over BTN2/3) -- each with the game it starts written below.
+    Returns the chosen game (via token_map), or None if the player quit.
+    """
+    try:
+        logo = pygame.image.load("Graphics/nod.png").convert_alpha()
+        logo_w = 180
+        scale = logo_w / logo.get_width()
+        logo = pygame.transform.smoothscale(
+            logo, (logo_w, int(logo.get_height() * scale)))
+    except (pygame.error, FileNotFoundError) as exc:
+        print(f"[menu] kunne ikke laste logo: {exc}")
+        logo = None
+
+    title_font = ui.font(72)
+    btn_font = ui.font(26)
+    label_font = ui.font(28)
+    sub_font = ui.font(20)
+
+    win_w, win_h = WINDOW_SIZE
+    cx = win_w // 2
+
+    # Only the top half of the board shows: it starts under the title and its
+    # bottom runs off the bottom of the window, so no USB cable is needed.
+    board_w = 520
+    board_rect = pygame.Rect(cx - board_w // 2, 200, board_w, win_h)
+
+    # 2x2 button block in the board's top-right corner, like the real switches.
+    btn_size = 170
+    cap_h = 55                 # space under each button for its two text lines
+    gap_x, gap_y = 40, 40
+    cell_w = btn_size + gap_x
+    cell_h = btn_size + cap_h + gap_y
+    grid_w = cell_w * 2 - gap_x
+    grid_x = board_rect.right - 50 - grid_w
+    grid_y = board_rect.top + 50
+
+    def button_rect(i):
+        row, col = divmod(i, 2)
+        x = grid_x + col * cell_w
+        y = grid_y + row * cell_h
+        return pygame.Rect(x, y, btn_size, btn_size)
+
+    playable = [i for i, cell in enumerate(MENU_GRID) if cell[3] is not None]
+    selected = 0
+
+    while True:
+        controller.drain(menu=False)
+
+        token = controller.get_menu()
+        if token in token_map:
+            return token_map[token]
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+            if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_UP, pygame.K_w,
+                                 pygame.K_LEFT, pygame.K_a):
+                    selected = (selected - 1) % len(playable)
+                elif event.key in (pygame.K_DOWN, pygame.K_s,
+                                   pygame.K_RIGHT, pygame.K_d):
+                    selected = (selected + 1) % len(playable)
+                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    return token_map[MENU_GRID[playable[selected]][3]]
+                elif event.key == pygame.K_ESCAPE:
+                    return None
+
+        # ---- draw ----
+        screen.fill(ui.BG_COLOR)
+
+        title_surf = title_font.render("Edge AI Games", True, ui.TEXT_COLOR)
+        screen.blit(title_surf, title_surf.get_rect(center=(cx, 90)))
+
+        # The board goes down first, so the buttons sit on top of it.
+        _draw_dk_board(screen, board_rect)
+
+        for i, (btn, line1, line2, tok) in enumerate(MENU_GRID):
+            rect = button_rect(i)
+            enabled = tok is not None
+            is_sel = enabled and playable[selected] == i
+
+            # Game name goes on the button itself now, not "BTN0" etc.
+            _draw_button(screen, rect, line1, is_sel, enabled, btn_font)
+
+            # Only the sub-line (input method) stays under the button.
+            if line2:
+                l2 = sub_font.render(line2, True, ui.TEXT_COLOR)
+                screen.blit(l2, l2.get_rect(center=(rect.centerx, rect.bottom + 24)))
+        
+        pygame.display.update()
+        clock.tick(60)
+
 
 def run_app(screen, clock, controller):
     """Top-level state machine: menu -> countdown -> play -> game over -> menu.
@@ -283,9 +429,7 @@ def run_app(screen, clock, controller):
     while True:
         # --- main menu: choose a game ---
         if game is None:
-            game = choose(screen, clock, controller,
-                          "Edge AI Games", [g.name for g in GAMES],
-                          values=GAMES, token_map=GAME_TOKENS, hint=MENU_HINT)
+            game = main_menu(screen, clock, controller, GAME_TOKENS)
             if game is None:
                 return
 
