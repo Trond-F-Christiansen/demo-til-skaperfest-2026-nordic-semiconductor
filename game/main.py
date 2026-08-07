@@ -318,12 +318,11 @@ def show_result(screen, clock, controller, game, result):
 
 
 MENU_GRID = [
-    ("BTN0", "Snake", "(stemme)", "SNAKE"),
-    ("BTN1", "Snake", "(bevegelse)", "SNAKE"),
-    ("BTN2", "Minesveiper", "", "MINESWEEPER"),
-    ("BTN3", "", "", None),
+    ("BTN0", "Snake", "(bevegelse)", "SNAKE"),
+    ("BTN1", "Quiz", "", "QUIZ"),
+    ("BTN2", "Snake", "(stemme)", "SNAKE"),
+    ("BTN3", "Minesweeper", "", "MINESWEEPER"),
 ]
-
 
 def _draw_button(screen, rect, label, selected, enabled, btn_font):
     """Draw one DK-style push button: a light keycap with a round cap on top."""
@@ -499,11 +498,6 @@ def run_app(screen, clock, controller):
             return
         played = game
 
-        result = game.run(screen, clock, controller)
-        if result is None:      # window closed mid-game -> quit app
-            return
-        played = game
-
         # --- game over: show the result, then back to the main menu ---
         if not show_result(screen, clock, controller, game, result):
             return              # quit
@@ -511,9 +505,9 @@ def run_app(screen, clock, controller):
 
 
 def parse_args(argv=None):
-def parse_args(argv=None):
     """Parse the command line: an optional serial port, plus its baud rate."""
     parser = argparse.ArgumentParser(description="Edge AI Games")
+
     parser.add_argument(
         "port", nargs="?", default=None,
         help="console port of the DK running game_receiver, e.g. /dev/ttyACM3. "
