@@ -75,6 +75,10 @@ static void on_button_click(uint8_t button_id, button_click_t click)
 	case 2:
 		start_game(ENGINE_NAME_KWS_MINE, "MENU:MINESWEEPER\r\n");
 		break;
+	case 3:
+		/* Back to the host menu; engine unchanged. */
+		(void)ble_nus_send_raw("MENU:BACK\r\n");
+		break;
 	default:
 		LOG_WRN("Ukjent knapp: %u", button_id);
 		break;

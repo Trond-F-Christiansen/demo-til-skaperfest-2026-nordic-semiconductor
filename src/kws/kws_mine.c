@@ -66,7 +66,7 @@ static const struct mine_detection_ctx mine_ctxs[] = {
     [MINE_SEVEN]   = {.name = "seven",   .token = "SEVEN\r\n", .threshold = 0.3f,  .num_in_row = 5},
     [MINE_SIX]     = {.name = "six",     .token = "SIX\r\n",   .threshold = 0.3f,  .num_in_row = 5},
     [MINE_THREE]   = {.name = "three",   .token = "THREE\r\n", .threshold = 0.4f,  .num_in_row = 6},
-    [MINE_TWO]     = {.name = "two",     .token = "TWO\r\n",   .threshold = 0.3f,  .num_in_row = 5},
+    [MINE_TWO]     = {.name = "two",     .token = "TWO\r\n",   .threshold = 0.2f,  .num_in_row = 5},
     [MINE_ZERO]    = {.name = "zero",    .token = "ZERO\r\n",  .threshold = 0.3f,  .num_in_row = 5},
 };
 

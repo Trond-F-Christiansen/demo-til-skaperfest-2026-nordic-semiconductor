@@ -59,7 +59,7 @@ typedef enum {
  */
 typedef void (*button_click_handler_t)(uint8_t button_id, button_click_t click);
 /** Antall knapper modulen håndterer. */
-#define BUTTON_COUNT 3
+#define BUTTON_COUNT 4
 
 /**
  * @brief Initialize the button module and its GPIO ISR.

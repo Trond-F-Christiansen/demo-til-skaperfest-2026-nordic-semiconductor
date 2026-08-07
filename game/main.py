@@ -29,7 +29,7 @@ Every screen is navigated the same three ways:
     ESC             quit
     controller      the buttons on a sender board pick an option directly
 Those buttons are physical buttons relayed to us over UART as MENU: tokens; see
-MENU_BACK below and controller.get_menu().
+controller.get_menu().
 """
 
 import argparse
@@ -56,11 +56,9 @@ COUNTDOWN_SECONDS = 3
 # game_controller's btn0 and btn1 both send SNAKE, differing only in the engine
 # they switch to (voice vs swipe gestures), which is entirely that board's
 # business since both feed us the same UP/DOWN/LEFT/RIGHT commands. QUIZ comes
-# from the finger_digits board instead. A long click on any button sends BACK.
+# from the finger_digits board instead.
 #
-# Screens therefore map tokens by meaning, not by position: see MENU_TOKENS and
-# GAME_OVER_TOKENS in run_app().
-MENU_BACK = "BACK"
+# The main menu maps each token to a game via GAME_TOKENS in run_app().
 
 
 class Game:
@@ -225,30 +223,61 @@ def countdown(screen, clock, controller, game, seconds=COUNTDOWN_SECONDS):
 
 
 # Returned by the game-over screen when the player wants the game list back.
-MAIN_MENU = object()
 
+def show_result(screen, clock, controller, game, result):
+    """Show the run's result, then wait for any input before the menu.
+
+    Returns True to go on to the main menu, False if the player quit.
+    Any keypress or controller button dismisses the screen; the button's
+    engine switch is harmless because the main menu re-selects on the next
+    game choice anyway.
+    """
+    title_font = ui.font(72)
+    sub_font = ui.font(36)
+    hint_font = ui.font(24)
+    cx = WINDOW_SIZE[0] // 2
+
+    while True:
+        controller.drain(menu=False)
+        if controller.get_menu() is not None:
+            return True
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    return False
+                return True
+
+        screen.fill(ui.BG_COLOR)
+
+        title_surf = title_font.render("Game Over", True, ui.TEXT_COLOR)
+        screen.blit(title_surf, title_surf.get_rect(center=(cx, 200)))
+
+        sub_surf = sub_font.render(f"{game.name}    {game.result_text(result)}",
+                                   True, ui.TEXT_COLOR)
+        screen.blit(sub_surf, sub_surf.get_rect(center=(cx, 290)))
+
+        hint_surf = hint_font.render("Trykk en knapp for meny", True, ui.TEXT_COLOR)
+        screen.blit(hint_surf, hint_surf.get_rect(center=(cx, WINDOW_SIZE[1] - 70)))
+
+        pygame.display.update()
+        clock.tick(60)
 
 def run_app(screen, clock, controller):
-    """Top-level state machine: menu -> countdown -> play -> game over -> ...
+    """Top-level state machine: menu -> countdown -> play -> game over -> menu.
 
     A controller button always means the same thing on every screen: "play this
-    game, with the engine this button selects". So both screens map tokens
-    straight to a Game -- including from the game-over screen, where btn1 after
-    a round of snake replays it with gestures, and btn2 leaves for minesweeper.
+    game, with the engine this button selects". The main menu maps each token
+    straight to a Game; after a round, the game-over screen just shows the
+    result and returns to the menu, so there is no per-game restart button to
+    keep in sync with the controller's engine switch.
     """
-    # Which game each token opens. BACK means nothing on the main menu -- there
-    # is nothing behind it; ESC quits.
+    # Which game each token opens.
     GAME_TOKENS = {g.name.upper(): g for g in GAMES}
     MENU_HINT = ("BTN0: Snake (voice)    BTN1: Snake (gesture)    "
                  "BTN2: Minesweeper")
-
-    # Which buttons send which game token, for the game-over hint. btn0 and btn1
-    # both open snake and differ only in the engine they select; the quiz has no
-    # button here at all, since it is played from the finger_digits board.
-    TOKEN_BUTTONS = {
-        "SNAKE": ["BTN0 voice", "BTN1 gesture"],
-        "MINESWEEPER": ["BTN2"],
-    }
 
     game = None
     while True:
@@ -268,27 +297,10 @@ def run_app(screen, clock, controller):
         if result is None:      # window closed mid-game -> quit app
             return
 
-        # --- game over: replay, switch game/engine, or back to the menu ---
-        # Restarting from the keyboard keeps whichever engine the controller is
-        # already on; pressing a button restates it, which is how you change
-        # engine without a detour through the main menu.
-        restart_with = TOKEN_BUTTONS.get(game.name.upper(), [])
-        restart_hint = f"Restart: {'   '.join(restart_with)}    " if restart_with else ""
-
-        game = choose(
-            screen, clock, controller,
-            "Game Over",
-            ["Restart", "Main Menu"],
-            subtitle=f"{game.name}    {game.result_text(result)}",
-            values=[game, MAIN_MENU],
-            token_map={**GAME_TOKENS, MENU_BACK: MAIN_MENU},
-            hint=restart_hint + "Hold: Main Menu",
-        )
-        if game is None:        # quit
-            return
-        if game is MAIN_MENU:
-            game = None         # fall back into the game list next loop
-
+        # --- game over: show the result, then back to the main menu ---
+        if not show_result(screen, clock, controller, game, result):
+            return              # quit
+        game = None             # always return to the game list
 
 def parse_args(argv=None):
     """Parse the command line: an optional serial port, plus its baud rate."""

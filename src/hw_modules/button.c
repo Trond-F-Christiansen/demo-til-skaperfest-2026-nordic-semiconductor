@@ -17,6 +17,7 @@ LOG_MODULE_REGISTER(button, CONFIG_LOG_DEFAULT_LEVEL);
 #define SW0_NODE DT_ALIAS(sw0)
 #define SW1_NODE DT_ALIAS(sw1)
 #define SW2_NODE DT_ALIAS(sw2)
+#define SW3_NODE DT_ALIAS(sw3)
 
 #if !DT_NODE_HAS_STATUS(SW0_NODE, okay)
 #error "sw0 devicetree alias is not defined"
@@ -26,6 +27,9 @@ LOG_MODULE_REGISTER(button, CONFIG_LOG_DEFAULT_LEVEL);
 #endif
 #if !DT_NODE_HAS_STATUS(SW2_NODE, okay)
 #error "sw2 devicetree alias is not defined"
+#endif
+#if !DT_NODE_HAS_STATUS(SW3_NODE, okay)
+#error "sw3 devicetree alias is not defined"
 #endif
 
 /* Debounce delay (ms) used after each interrupt before sampling the pin. */
@@ -49,6 +53,7 @@ static struct button_ctx buttons[BUTTON_COUNT] = {
 	{ .spec = GPIO_DT_SPEC_GET_OR(SW0_NODE, gpios, {0}), .id = 0 },
 	{ .spec = GPIO_DT_SPEC_GET_OR(SW1_NODE, gpios, {0}), .id = 1 },
 	{ .spec = GPIO_DT_SPEC_GET_OR(SW2_NODE, gpios, {0}), .id = 2 },
+	{ .spec = GPIO_DT_SPEC_GET_OR(SW3_NODE, gpios, {0}), .id = 3 },
 };
 
 static button_click_handler_t button_click_handler;
