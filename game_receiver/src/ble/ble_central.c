@@ -23,6 +23,7 @@
 #include <bluetooth/services/nus.h>
 #include <bluetooth/services/nus_client.h>
 
+#include "led_status/led_status.h"
 #include "score_bridge/score_bridge.h"
 
 LOG_MODULE_REGISTER(ble_central, LOG_LEVEL_INF);
@@ -73,6 +74,13 @@ BUILD_ASSERT(ARRAY_SIZE(peers) <= CONFIG_BT_MAX_CONN,
 BUILD_ASSERT(ARRAY_SIZE(peers) <= CONFIG_BT_SCAN_NAME_CNT,
 	     "CONFIG_BT_SCAN_NAME_CNT is too low to filter on every peer name");
 
+/* The status LEDs are mapped positionally onto this table -- led0 to peers[0],
+ * led1 to peers[1] -- so adding a peer without adding an LED must not silently
+ * leave the new one unindicated.
+ */
+BUILD_ASSERT(ARRAY_SIZE(peers) == LED_STATUS_COUNT,
+	     "Every peer needs a status LED (see led_status.h)");
+
 /* Set when a scan filter matches, consumed when the connection object appears.
  * Both callbacks run in the Bluetooth RX thread, and the scan module stops
  * scanning for the duration of a connection attempt, so the two cannot
@@ -109,6 +117,12 @@ static struct peer *peer_by_conn(const struct bt_conn *conn)
 	}
 
 	return NULL;
+}
+
+/* Index into peers[], which is also the peer's status LED. */
+static size_t peer_index(const struct peer *peer)
+{
+	return (size_t)(peer - peers);
 }
 
 static struct peer *peer_by_nus(const struct bt_nus_client *nus)
@@ -280,6 +294,7 @@ static void connected(struct bt_conn *conn, uint8_t conn_err)
 	}
 
 	LOG_INF("Connected %s (%s)", addr, peer->name);
+	led_status_set_connected(peer_index(peer), true);
 
 	/* Scanning is already stopped by the scan module for the duration of the
 	 * connection attempt; it resumes once discovery on this link finishes.
@@ -307,6 +322,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 
 	bt_conn_unref(peer->conn);
 	peer->conn = NULL;
+	led_status_set_connected(peer_index(peer), false);
 
 	/* The freed slot puts this peer's name back into the filter set. */
 	scan_resume(K_NO_WAIT);

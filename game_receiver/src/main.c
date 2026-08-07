@@ -14,6 +14,7 @@
 #include <zephyr/logging/log.h>
 
 #include "ble/ble_central.h"
+#include "led_status/led_status.h"
 #include "score_bridge/score_bridge.h"
 #include "test_button/test_button.h"
 
@@ -22,6 +23,18 @@ LOG_MODULE_REGISTER(main);
 int main(void)
 {
 	int err;
+
+	/* Before the BLE central, so both LEDs are already blinking by the time
+	 * scanning starts and the board never looks dead at boot.
+	 *
+	 * A failure here is not fatal: relaying commands is this board's job, and
+	 * losing the indicator is no reason to stop doing it. led_status_*() calls
+	 * from the BLE callbacks become no-ops.
+	 */
+	err = led_status_init();
+	if (err) {
+		LOG_WRN("Status LED init failed (err %d); continuing without LEDs", err);
+	}
 
 	err = score_bridge_init();
 	if (err) {

@@ -8,6 +8,7 @@ target_include_directories(app PRIVATE src)
 target_sources(app PRIVATE
   src/main.c
   src/ble/ble_central.c
+  src/led_status/led_status.c
   src/score_bridge/score_bridge.c
   src/test_button/test_button.c
 )
