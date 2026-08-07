@@ -32,7 +32,7 @@
 #define INPUT_WINDOW_SIZE                  64
 
 /** Number of input feature samples on that the input window is shifted */
-#define INPUT_WINDOW_SHIFT                 10
+#define INPUT_WINDOW_SHIFT                 5
 
 /** Number of subwindows in input feature window,
 * the SUBWINDOW_SIZE = INPUT_WINDOW_SIZE / INPUT_SUBWINDOW_NUM

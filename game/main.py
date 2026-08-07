@@ -7,9 +7,12 @@ Run from this folder (assets load via relative paths):
     python main.py --baudrate 115200 /dev/ttyACM3
 
 Flow:
-    main menu  -> pick a game
-    play        -> the game runs its own loop and returns the run's result
-    game over   -> Restart (same game) or Main Menu; the result is shown
+    main menu    -> pick a game
+    instructions -> how it is played, then continue (skipped when replaying the
+                    same game from the game-over screen)
+    countdown    -> gives an engine switch time to land
+    play         -> the game runs its own loop and returns the run's result
+    game over    -> Restart (same game) or Main Menu; the result is shown
 
 One window, one screen model: main() creates the display once and every screen
 -- this menu, the game-over screen and all three games -- draws into that same
@@ -21,8 +24,8 @@ ui.py.
 Adding a game later: write a module with a `run(screen, clock, controller)`
 that returns the run's result (int), or None if the window was closed
 mid-game, then add one entry to GAMES below -- with a result_label if "Score"
-is the wrong word for what it returns. The menu and game-over screens need no
-changes.
+is the wrong word for what it returns, and an `instructions` block for its
+how-to-play page. The menu, instructions and game-over screens need no changes.
 
 Every screen is navigated the same three ways:
     UP / DOWN       move the selection,  ENTER / SPACE confirm
@@ -36,6 +39,7 @@ import argparse
 
 import pygame
 
+import instructions
 import quiz
 import snake
 import ui
@@ -70,13 +74,18 @@ class Game:
                          unit to print after it. Minesweeper is timed, so its
                          result is seconds and lower is better; snake and quiz
                          return a higher-is-better score.
+    @param instructions  an instructions.Instructions for the how-to-play page
+                         shown on the way in, or None to go straight to the
+                         countdown.
     """
 
-    def __init__(self, name, run, result_label="Score", result_unit=""):
+    def __init__(self, name, run, result_label="Score", result_unit="",
+                 instructions=None):
         self.name = name
         self.run = run
         self.result_label = result_label
         self.result_unit = result_unit
+        self.instructions = instructions
 
     def result_text(self, result):
         return f"{self.result_label}: {result}{self.result_unit}"
@@ -84,10 +93,48 @@ class Game:
 
 # Registry of playable games -- extend this as games are added. Minesweeper is
 # a package rather than a single module, but its run() means the same thing.
+#
+# The instructions text is placeholder wording for now; the images are real,
+# taken from the Graphics/ art each game already uses, so the pages show the
+# gestures and hand shapes a player actually needs. Only the quiz has a gesture
+# assigned for leaving its page -- see instructions.py.
 GAMES = [
-    Game("Snake", snake.run),
-    Game("Quiz", quiz.run),
-    Game("Minesweeper", minesweeper_game.run, result_label="Time", result_unit="s"),
+    Game("Snake", snake.run,
+         instructions=instructions.Instructions(
+             lines=(
+                 "Steer the snake with swipe gestures: swipe up, down, left or "
+                 "right to turn.",
+                 "Eat the fruit to grow. Hitting a wall or your own tail ends "
+                 "the run.",
+                 "Placeholder instructions -- to be written.",
+             ),
+             images=("head_up", "head_left", "head_right", "head_down"),
+         )),
+    Game("Quiz", quiz.run, instructions=instructions.Instructions(
+             lines=(
+                 "Each question has up to five answers. Hold up the matching "
+                 "number of fingers to pick one.",
+                 "The correct answer lights up green for a moment, then the "
+                 "After the correct answer is shown, remove your hand from the box.",
+                 "Placeholder instructions -- to be written.",
+             ),
+             # The same hand shapes, in the same order, as the per-option
+             # graphics in quiz.py's run().
+             images=("one", "shaka", "rocknroll", "four", "five"),
+             advance=instructions.digit(2),
+             advance_hint="Vis to fingre for å starte",
+         )),
+    Game("Minesweeper", minesweeper_game.run, result_label="Time", result_unit="s",
+         instructions=instructions.Instructions(
+             lines=(
+                 "Pick a square by saying its row and column number out loud.",
+                 "Say \"open\" to uncover it, or \"flag\" to mark a mine.",
+                 "Clear every safe square as fast as you can -- your time is "
+                 "the score, so lower is better.",
+                 "Placeholder instructions -- to be written.",
+             ),
+             images=("zero", "one", "two", "three"),
+         )),
 ]
 
 
@@ -426,11 +473,21 @@ def run_app(screen, clock, controller):
                  "BTN2: Minesweeper")
 
     game = None
+    played = None               # the game whose round just finished; see below
     while True:
         # --- main menu: choose a game ---
         if game is None:
             game = main_menu(screen, clock, controller, GAME_TOKENS)
             if game is None:
+                return
+
+        # --- how to play, on the way in to a game ---
+        # Skipped for a straight "Restart" of the game just played -- re-reading
+        # the rules between rounds would only be in the way. Any other route
+        # here shows them: from the main menu (which clears `played` below), or
+        # by picking a different game with a button on the game-over screen.
+        if game is not played:
+            if not instructions.show(screen, clock, controller, game):
                 return
 
         # --- countdown, so a just-pressed engine switch has time to land ---
@@ -440,12 +497,20 @@ def run_app(screen, clock, controller):
         result = game.run(screen, clock, controller)
         if result is None:      # window closed mid-game -> quit app
             return
+        played = game
+
+        result = game.run(screen, clock, controller)
+        if result is None:      # window closed mid-game -> quit app
+            return
+        played = game
 
         # --- game over: show the result, then back to the main menu ---
         if not show_result(screen, clock, controller, game, result):
             return              # quit
         game = None             # always return to the game list
 
+
+def parse_args(argv=None):
 def parse_args(argv=None):
     """Parse the command line: an optional serial port, plus its baud rate."""
     parser = argparse.ArgumentParser(description="Edge AI Games")

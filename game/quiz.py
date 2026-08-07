@@ -11,9 +11,10 @@ QUESTIONS_PER_RUN of them at random (no repeats within a run), so consecutive
 plays differ. Grow the pot by adding entries to that list.
 
 Layout: the question prompt is drawn across the top; the answer options are
-stacked top -> down below it. Questions are answered one at a time in order;
-picking an answer advances to the next question. When the last question is
-answered, run() returns the score.
+stacked top -> down below it. Questions are answered one at a time in order.
+Picking an answer holds the question on screen for @ref REVEAL_SECONDS with the
+correct option filled green -- and the pick filled red when it was wrong -- then
+moves on by itself. When the last question is answered, run() returns the score.
 
 Input is either the keyboard or the finger counter: the finger_digits board
 sends a settled digit (0-5) over BLE, which is turned into the matching number
@@ -38,6 +39,11 @@ import ui
 # so consecutive runs differ. Raise or lower freely; a value at or above the pot
 # size just asks every question once, in a random order.
 QUESTIONS_PER_RUN = 10
+
+# How long an answered question stays on screen with the correct option marked
+# green before the next one replaces it. Long enough to read which answer was
+# right; short enough not to stall a run of ten. See _reveal().
+REVEAL_SECONDS = 2.0
 
 # A single quiz question. `answer` is the 0-based index into `options`.
 Question = namedtuple("Question", "prompt options answer")
@@ -123,37 +129,122 @@ def pick_questions(pot=QUESTIONS, count=QUESTIONS_PER_RUN):
     return random.sample(pot, min(count, len(pot)))
 
 
-def _wrap_text(text, font, max_width):
-    """Break `text` into lines that each fit within `max_width` pixels."""
-    words = text.split()
-    lines = []
-    current = ""
-    for word in words:
-        trial = word if not current else f"{current} {word}"
-        if font.size(trial)[0] <= max_width:
-            current = trial
-        else:
-            if current:
-                lines.append(current)
-            current = word
-    if current:
-        lines.append(current)
-    return lines
+def _draw_question(screen, question, index, total, assets, selected, reveal=False):
+    """Draw one frame of a question.
 
-
-def _ask(screen, clock, controller, question, index, total, assets):
-    """Show one question and return the chosen option index.
-
-    @return the selected 0-based option index, or None if the window was closed.
+    @param selected  the option the player is on, outlined while answering and
+                     kept as the record of their pick during the reveal.
+    @param reveal    False while the question is open: `selected` is outlined in
+                     ui.HILITE_BG. True once it has been answered: the correct
+                     option is filled green, and `selected` is filled red when
+                     it was not the correct one.
     """
     prompt_font, option_font, hint_font, small_font, finger_imgs = assets
     width, height = screen.get_size()
     cx = width // 2
     margin = 40
 
-    prompt_lines = _wrap_text(question.prompt, prompt_font, width - 2 * margin)
+    prompt_lines = ui.wrap_text(question.prompt, prompt_font, width - 2 * margin)
     line_h = prompt_font.get_linesize()
 
+    screen.fill(ui.BG_COLOR)
+
+    # Progress line, then the prompt, across the top.
+    progress = small_font.render(f"Question {index + 1} / {total}", True, ui.TEXT_COLOR)
+    screen.blit(progress, progress.get_rect(center=(cx, 50)))
+
+    prompt_top = 110
+    for i, line in enumerate(prompt_lines):
+        surf = prompt_font.render(line, True, ui.TEXT_COLOR)
+        screen.blit(surf, surf.get_rect(center=(cx, prompt_top + i * line_h)))
+
+    # Options stacked top -> down: text left-aligned, and the matching
+    # finger graphic (one/two/three/four) right-aligned on the same row.
+    left_x = margin
+    right_x = width - margin
+    options_top = prompt_top + len(prompt_lines) * line_h + 90
+    gap = 112
+    for i, text in enumerate(question.options):
+        row_y = options_top + i * gap
+
+        if reveal:
+            if i == question.answer:
+                box_color = ui.CORRECT_BG
+            elif i == selected:
+                box_color = ui.WRONG_BG
+            else:
+                box_color = None
+        else:
+            box_color = ui.HILITE_BG if i == selected else None
+
+        img = finger_imgs[i] if i < len(finger_imgs) else None
+        img_rect = img.get_rect(midright=(right_x, row_y)) if img else None
+
+        # Options come from questions.md and can be long ("en person som
+        # ikke er interessert i politikk"), so squeeze any that would
+        # otherwise run into the finger graphic on the right.
+        text_surf = option_font.render(text, True, ui.TEXT_COLOR)
+        room = (img_rect.left - 24 if img_rect else right_x) - left_x
+        if text_surf.get_width() > room:
+            scale = room / text_surf.get_width()
+            text_surf = pygame.transform.smoothscale(
+                text_surf,
+                (room, max(1, round(text_surf.get_height() * scale))))
+        text_rect = text_surf.get_rect(midleft=(left_x, row_y))
+
+        if box_color is not None:
+            tops = [text_rect.top] + ([img_rect.top] if img_rect else [])
+            bottoms = [text_rect.bottom] + ([img_rect.bottom] if img_rect else [])
+            top = min(tops) - 12
+            box = pygame.Rect(left_x - 24, top,
+                              (right_x - left_x) + 48, max(bottoms) + 12 - top)
+            pygame.draw.rect(screen, box_color, box, border_radius=10)
+            pygame.draw.rect(screen, ui.TEXT_COLOR, box, 3, border_radius=10)
+
+        screen.blit(text_surf, text_rect)
+        if img:
+            screen.blit(img, img_rect)
+
+    # While answering, the hint says how to answer. During the reveal it would
+    # be a lie -- input is dropped -- so it reports the outcome instead.
+    if reveal:
+        hint_text = "Correct!" if selected == question.answer else "The green one was right"
+    else:
+        hint_text = "Show 1-5 fingers"
+    hint = hint_font.render(hint_text, True, ui.TEXT_COLOR)
+    screen.blit(hint, hint.get_rect(center=(cx, height - 60)))
+
+
+def _reveal(screen, clock, controller, question, index, total, assets, chosen):
+    """Hold an answered question on screen, correct option green, for REVEAL_SECONDS.
+
+    Input is dropped for the whole pause. The finger counter keeps reporting for
+    as long as a hand is up, so without this a digit held through the pause would
+    answer the next question the instant it appeared.
+
+    @return True when the pause is over, False if the window was closed.
+    """
+    deadline = pygame.time.get_ticks() + int(REVEAL_SECONDS * 1000)
+
+    while pygame.time.get_ticks() < deadline:
+        controller.drain()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+
+        _draw_question(screen, question, index, total, assets, chosen, reveal=True)
+        pygame.display.update()
+        clock.tick(60)
+
+    return True
+
+
+def _ask(screen, clock, controller, question, index, total, assets):
+    """Show one question, then reveal the answer, and return the chosen option.
+
+    @return the selected 0-based option index, or None if the window was closed.
+    """
     # K_1..K_9 -> option 0..8 (a finger count of N picks option N), capped to
     # the options. K_0 is deliberately absent: showing zero fingers picks
     # nothing, so a "ZERO" prediction falls through and is ignored.
@@ -178,70 +269,26 @@ def _ask(screen, clock, controller, question, index, total, assets):
             if event.type == pygame.QUIT:
                 return None
             if event.type == pygame.KEYDOWN:
+                choice = None
                 if event.key in digit_keys and digit_keys[event.key] < len(question.options):
-                    return digit_keys[event.key]
-                if event.key in (pygame.K_UP, pygame.K_w):
+                    choice = digit_keys[event.key]
+                elif event.key in (pygame.K_UP, pygame.K_w):
                     selected = (selected - 1) % len(question.options)
                 elif event.key in (pygame.K_DOWN, pygame.K_s):
                     selected = (selected + 1) % len(question.options)
                 elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                    return selected
+                    choice = selected
 
-        # ---- draw ----
-        screen.fill(ui.BG_COLOR)
+                # Answered: show which option was right before moving on. The
+                # window can still be closed during that pause, which reads the
+                # same as closing it mid-question.
+                if choice is not None:
+                    if not _reveal(screen, clock, controller, question,
+                                   index, total, assets, choice):
+                        return None
+                    return choice
 
-        # Progress line, then the prompt, across the top.
-        progress = small_font.render(f"Question {index + 1} / {total}", True, ui.TEXT_COLOR)
-        screen.blit(progress, progress.get_rect(center=(cx, 50)))
-
-        prompt_top = 110
-        for i, line in enumerate(prompt_lines):
-            surf = prompt_font.render(line, True, ui.TEXT_COLOR)
-            screen.blit(surf, surf.get_rect(center=(cx, prompt_top + i * line_h)))
-
-        # Options stacked top -> down: text left-aligned, and the matching
-        # finger graphic (one/two/three/four) right-aligned on the same row.
-        left_x = margin
-        right_x = width - margin
-        options_top = prompt_top + len(prompt_lines) * line_h + 90
-        gap = 112
-        for i, text in enumerate(question.options):
-            is_sel = (i == selected)
-            row_y = options_top + i * gap
-
-            img = finger_imgs[i] if i < len(finger_imgs) else None
-            img_rect = img.get_rect(midright=(right_x, row_y)) if img else None
-
-            # Options come from questions.md and can be long ("en person som
-            # ikke er interessert i politikk"), so squeeze any that would
-            # otherwise run into the finger graphic on the right.
-            text_surf = option_font.render(text, True, ui.TEXT_COLOR)
-            room = (img_rect.left - 24 if img_rect else right_x) - left_x
-            if text_surf.get_width() > room:
-                scale = room / text_surf.get_width()
-                text_surf = pygame.transform.smoothscale(
-                    text_surf,
-                    (room, max(1, round(text_surf.get_height() * scale))))
-            text_rect = text_surf.get_rect(midleft=(left_x, row_y))
-
-            if is_sel:
-                tops = [text_rect.top] + ([img_rect.top] if img_rect else [])
-                bottoms = [text_rect.bottom] + ([img_rect.bottom] if img_rect else [])
-                top = min(tops) - 12
-                box = pygame.Rect(left_x - 24, top,
-                                  (right_x - left_x) + 48, max(bottoms) + 12 - top)
-                pygame.draw.rect(screen, ui.HILITE_BG, box, border_radius=10)
-                pygame.draw.rect(screen, ui.TEXT_COLOR, box, 3, border_radius=10)
-
-            screen.blit(text_surf, text_rect)
-            if img:
-                screen.blit(img, img_rect)
-
-        hint = hint_font.render(
-            f"Show or press 1-{len(question.options)}    or    UP / DOWN + ENTER",
-            True, ui.TEXT_COLOR)
-        screen.blit(hint, hint.get_rect(center=(cx, height - 60)))
-
+        _draw_question(screen, question, index, total, assets, selected)
         pygame.display.update()
         clock.tick(60)
 
