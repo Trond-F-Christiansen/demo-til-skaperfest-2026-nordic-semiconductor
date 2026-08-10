@@ -317,11 +317,12 @@ def show_result(screen, clock, controller, game, result):
 # bottom-left, bottom-right -- matching the board's BTN0/1 over BTN2/3.
 
 
+
 MENU_GRID = [
     ("BTN0", "Snake", "(bevegelse)", "SNAKE"),
-    ("BTN1", "Quiz", "", "QUIZ"),
+    ("BTN1", "Quiz", "(kamera)", "QUIZ"),
     ("BTN2", "Snake", "(stemme)", "SNAKE"),
-    ("BTN3", "Minesweeper", "", "MINESWEEPER"),
+    ("BTN3", "Minesweeper", "(stemme)", "MINESWEEPER"),
 ]
 
 def _draw_button(screen, rect, label, selected, enabled, btn_font):
@@ -387,17 +388,17 @@ def main_menu(screen, clock, controller, token_map):
 
     # Only the top half of the board shows: it starts under the title and its
     # bottom runs off the bottom of the window, so no USB cable is needed.
-    board_w = 520
+    board_w = 680
     board_rect = pygame.Rect(cx - board_w // 2, 200, board_w, win_h)
 
     # 2x2 button block in the board's top-right corner, like the real switches.
-    btn_size = 170
+    btn_size = 250
     cap_h = 55                 # space under each button for its two text lines
     gap_x, gap_y = 40, 40
     cell_w = btn_size + gap_x
     cell_h = btn_size + cap_h + gap_y
     grid_w = cell_w * 2 - gap_x
-    grid_x = board_rect.right - 50 - grid_w
+    grid_x = board_rect.right - 45 - grid_w
     grid_y = board_rect.top + 50
 
     def button_rect(i):

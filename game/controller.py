@@ -281,6 +281,7 @@ class SerialController:
             menu_match = _MENU_RE.search(line)
             if menu_match:
                 self.menu.put(menu_match.group(1).upper())
+                print(f"[controller] MENU token mottatt: {menu_match.group(1).upper()}")
                 continue
             match = _COMMAND_RE.search(line)
             if not match:

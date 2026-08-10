@@ -137,16 +137,20 @@ def show(screen, clock, controller, game):
         if guide.advance is not None and guide.advance(controller):
             return True
 
-        # Everything else -- swipes, spoken numbers, menu buttons -- means
+        # The game's own button starts it: btn0 (SNAKE) on Snake's page, etc.
+        # Its menu token matches the game name. Checked before drain(), which
+        # would otherwise empty the queue.
+        if controller.get_menu() == game.name.upper():
+            return True
+
+        # Everything else -- swipes, spoken numbers, other buttons -- means
         # nothing on this page and would be stale by the time the game starts.
-        controller.drain()
+        controller.drain(menu=False)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
             if event.type == pygame.KEYDOWN:
-                if event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                    return True
                 if event.key == pygame.K_ESCAPE:
                     return False
 
@@ -177,7 +181,7 @@ def show(screen, clock, controller, game):
                 screen.blit(img, img.get_rect(midleft=(x, row_y)))
                 x += img.get_width() + IMAGE_GAP
 
-        hint = guide.advance_hint or "ENTER to start"
+        hint = guide.advance_hint or "Trykk samme knapp igjen for å starte"
         hint_surf = hint_font.render(hint, True, ui.TEXT_COLOR)
         screen.blit(hint_surf, hint_surf.get_rect(center=(cx, hint_y)))
 
