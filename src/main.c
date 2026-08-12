@@ -67,10 +67,10 @@ static void on_button_click(uint8_t button_id, button_click_t click)
 
 	switch (button_id) {
 	case 0:
-		start_game(ENGINE_NAME_KWS, "MENU:SNAKE\r\n");
+		start_game(ENGINE_NAME_KWS, "MENU:SNAKE_VOICE\r\n");
 		break;
 	case 1:
-		start_game(ENGINE_NAME_GESTURE, "MENU:SNAKE\r\n");
+		start_game(ENGINE_NAME_GESTURE, "MENU:SNAKE_GESTURE\r\n");
 		break;
 	case 2:
 		start_game(ENGINE_NAME_KWS_MINE, "MENU:MINESWEEPER\r\n");

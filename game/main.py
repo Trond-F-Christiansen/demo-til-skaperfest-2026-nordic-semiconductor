@@ -80,12 +80,13 @@ class Game:
     """
 
     def __init__(self, name, run, result_label="Score", result_unit="",
-                 instructions=None):
+                 instructions=None, token=None):
         self.name = name
         self.run = run
         self.result_label = result_label
         self.result_unit = result_unit
         self.instructions = instructions
+        self.token = token
 
     def result_text(self, result):
         return f"{self.result_label}: {result}{self.result_unit}"
@@ -99,41 +100,58 @@ class Game:
 # gestures and hand shapes a player actually needs. Only the quiz has a gesture
 # assigned for leaving its page -- see instructions.py.
 GAMES = [
-    Game("Snake", snake.run,
+    Game("Snake (stemme)", snake.run, token="SNAKE_VOICE",
          instructions=instructions.Instructions(
              lines=(
-                 "Steer the snake with swipe gestures: swipe up, down, left or "
-                 "right to turn.",
-                 "Eat the fruit to grow. Hitting a wall or your own tail ends "
-                 "the run.",
-                 "Placeholder instructions -- to be written.",
+                 "Styr slangen med stemmen: si opp, ned, venstre eller høyre.",
+                 "Spis frukten for å vokse. Treffer du veggen eller din egen "
+                 "hale, er runden over.",
              ),
              images=("head_up", "head_left", "head_right", "head_down"),
+             advance_hint="Trykk BTN0 for å starte",
          )),
-    Game("Quiz", quiz.run, instructions=instructions.Instructions(
+    Game("Snake (bevegelse)", snake.run, token="SNAKE_GESTURE",
+         instructions=instructions.Instructions(
              lines=(
-                 "Each question has up to five answers. Hold up the matching "
-                 "number of fingers to pick one.",
-                 "The correct answer lights up green for a moment, then the "
-                 "After the correct answer is shown, remove your hand from the box.",
-                 "Placeholder instructions -- to be written.",
+                 "Styr slangen med håndbevegelser: sveip opp, ned, venstre "
+                 "eller høyre for å svinge.",
+                 "Spis frukten for å vokse. Treffer du veggen eller din egen "
+                 "hale, er runden over.",
              ),
-             # The same hand shapes, in the same order, as the per-option
-             # graphics in quiz.py's run().
+             images=("head_up", "head_left", "head_right", "head_down"),
+             advance_hint="Trykk BTN1 for å starte",
+         )),
+    Game("Quiz", quiz.run, token="QUIZ", instructions=instructions.Instructions(
+             lines=(
+                 "Quizen har 10 spørsmål. Hvert spørsmål har opptil fem svar.",
+                 "Hold opp så mange fingre som svaret du vil velge -- se nøye "
+                 "på bildene under for hvordan hvert tall vises.",
+                 "Håndbevegelsene er ikke alltid opplagte, så studer dem godt "
+                 "før du starter.",
+                 "Riktig svar lyser grønt et lite øyeblikk. Ta hånden ut av "
+                 "boksen når neste spørsmål kommer.",
+                 "Du får poeng for hvert riktige svar. Lykke til!",
+             ),
              images=("one", "shaka", "rocknroll", "four", "five"),
              advance=instructions.digit(2),
              advance_hint="Vis to fingre for å starte",
          )),
-    Game("Minesweeper", minesweeper_game.run, result_label="Time", result_unit="s",
+    Game("Minesweeper", minesweeper_game.run, token="MINESWEEPER",
+         result_label="Tid", result_unit="s",
          instructions=instructions.Instructions(
              lines=(
-                 "Pick a square by saying its row and column number out loud.",
-                 "Say \"open\" to uncover it, or \"flag\" to mark a mine.",
-                 "Clear every safe square as fast as you can -- your time is "
-                 "the score, so lower is better.",
-                 "Placeholder instructions -- to be written.",
+                 "Si \"mark\" for å åpne ruter, eller \"bomb\" for å markere "
+                 "en bombe. Modusen henger igjen til du bytter -- du sier den "
+                 "bare én gang, ikke for hver rute.",
+                 "Velg en rute: si radnummeret på engelsk (0-7), vent litt, "
+                 "og si så kolonnenummeret.",
+                 "Si \"no\" for å angre, eller \"reset\" to ganger for å "
+                 "starte på nytt.",
+                 "Åpne alle trygge ruter så raskt du kan -- tiden din er "
+                 "poengsummen, så jo lavere jo bedre. Lykke til!",
              ),
-             images=("zero", "one", "two", "three"),
+             images=("flag", "bomb"),
+             advance_hint="Trykk BTN2 for å starte",
          )),
 ]
 
@@ -319,9 +337,9 @@ def show_result(screen, clock, controller, game, result):
 
 
 MENU_GRID = [
-    ("BTN0", "Snake", "(bevegelse)", "SNAKE"),
+    ("BTN0", "Snake", "(bevegelse)", "SNAKE_GESTURE"),
     ("BTN1", "Quiz", "(kamera)", "QUIZ"),
-    ("BTN2", "Snake", "(stemme)", "SNAKE"),
+    ("BTN2", "Snake", "(stemme)", "SNAKE_VOICE"),
     ("BTN3", "Minesweeper", "(stemme)", "MINESWEEPER"),
 ]
 
@@ -468,7 +486,7 @@ def run_app(screen, clock, controller):
     keep in sync with the controller's engine switch.
     """
     # Which game each token opens.
-    GAME_TOKENS = {g.name.upper(): g for g in GAMES}
+    GAME_TOKENS = {g.token: g for g in GAMES}
     MENU_HINT = ("BTN0: Snake (voice)    BTN1: Snake (gesture)    "
                  "BTN2: Minesweeper")
 

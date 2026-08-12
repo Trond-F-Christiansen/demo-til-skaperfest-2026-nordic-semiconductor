@@ -140,7 +140,7 @@ def show(screen, clock, controller, game):
         # The game's own button starts it: btn0 (SNAKE) on Snake's page, etc.
         # Its menu token matches the game name. Checked before drain(), which
         # would otherwise empty the queue.
-        if controller.get_menu() == game.name.upper():
+        if controller.get_menu() == game.token:
             return True
 
         # Everything else -- swipes, spoken numbers, other buttons -- means
@@ -151,6 +151,8 @@ def show(screen, clock, controller, game):
             if event.type == pygame.QUIT:
                 return False
             if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    return True
                 if event.key == pygame.K_ESCAPE:
                     return False
 

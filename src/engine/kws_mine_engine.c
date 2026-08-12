@@ -35,7 +35,6 @@ static int kws_mine_engine_init(void)
 		LOG_ERR("Minesweeper KWS init failed (err %d)", err);
 		return err;
 	}
-
 	return 0;
 }
 
