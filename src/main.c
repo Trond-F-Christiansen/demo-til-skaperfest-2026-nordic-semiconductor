@@ -35,6 +35,7 @@
 #include "hw_modules/button.h"
 #include "engine/engine.h"
 #include "engine/engine_controller.h"
+#include "hw_modules/leds.h"
 
 LOG_MODULE_REGISTER(main);
 
@@ -100,7 +101,11 @@ int main(void)
 		return err;
 	}
 	button_reg_click_handler(on_button_click);
-
+	err = leds_init();
+	if (err) {
+		LOG_ERR("LED init failed (err %d)", err);
+		return err;
+	}
 	err = ble_nus_init();
 	if (err) {
 		LOG_ERR("BLE NUS init failed (err %d)", err);

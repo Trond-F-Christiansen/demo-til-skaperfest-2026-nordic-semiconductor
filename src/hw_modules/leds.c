@@ -25,6 +25,15 @@ BUILD_ASSERT(ARRAY_SIZE(leds) == LEDS_COUNT, "leds array size mismatch with LEDS
 static void led_timer_expiry(struct k_timer *timer);
 static K_TIMER_DEFINE(led_timer, led_timer_expiry, NULL);
 
+// Egen timer for tilkoblingsstatus paa LED0 (periodisk blink)
+static void conn_led_expiry(struct k_timer *timer);
+static K_TIMER_DEFINE(conn_led_timer, conn_led_expiry, NULL);
+
+static void conn_led_expiry(struct k_timer *timer)
+{
+        gpio_pin_toggle_dt(&led0);
+}
+
 static int led_init(const struct gpio_dt_spec *spec)
 {
 	int err;
@@ -135,4 +144,18 @@ void leds_set_only(unsigned int idx)
 	for (size_t i = 0; i < ARRAY_SIZE(leds); i++) {
 		gpio_pin_set_dt(leds[i], i == idx);
 	}
+}
+
+void leds_conn_waiting(void)
+{
+        // Blink LED0 hver 250 ms mens vi venter paa tilkobling
+        gpio_pin_set_dt(&led0, 1);
+        k_timer_start(&conn_led_timer, K_MSEC(250), K_MSEC(250));
+}
+
+void leds_conn_connected(void)
+{
+        // Stopp blinking og la LED0 lyse fast
+        k_timer_stop(&conn_led_timer);
+        gpio_pin_set_dt(&led0, 1);
 }

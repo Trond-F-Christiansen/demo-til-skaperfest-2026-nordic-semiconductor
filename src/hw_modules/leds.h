@@ -54,6 +54,16 @@ void leds_off_led0(void);
  */
 void leds_set_only(unsigned int idx);
 
+/**
+ * @brief Blink LED1 to indicate waiting for BLE connection.
+ */
+void leds_conn_waiting(void);
+
+/**
+ * @brief Light LED1 solid to indicate an active BLE connection.
+ */
+void leds_conn_connected(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

@@ -6,6 +6,7 @@ project(game_controller)
 target_sources(app PRIVATE
   src/main.c
   src/hw_modules/button.c
+  src/hw_modules/leds.c
   src/gesture/imu/imu.c
 
   src/ble/ble_nus.c

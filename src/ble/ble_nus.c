@@ -16,6 +16,7 @@
 #include <zephyr/sys/util.h>
 
 #include <bluetooth/services/nus.h>
+#include "../hw_modules/leds.h"
 
 LOG_MODULE_REGISTER(ble_nus, LOG_LEVEL_INF);
 
@@ -61,7 +62,8 @@ static void nus_connected(struct bt_conn *conn, uint8_t err)
 	if (!nus_conn) {
 		nus_conn = bt_conn_ref(conn);
 	}
-
+	// LED1 fast paa naar tilkoblet
+    leds_conn_connected();
 	LOG_INF("Connected %s", addr);
 }
 
@@ -84,6 +86,8 @@ static void nus_disconnected(struct bt_conn *conn, uint8_t reason)
 	}
 
 	nus_send_enabled = false;
+	// Blink LED1 igjen mens vi venter paa ny tilkobling
+    leds_conn_waiting();
 
 	/* Advertising is deliberately NOT restarted here. This callback runs while
 	 * the connection object still exists, and with CONFIG_BT_MAX_CONN at its
@@ -148,6 +152,8 @@ int ble_nus_init(void)
 	}
 
 	LOG_INF("Advertising started");
+	// Start med aa blinke LED1 mens vi venter paa tilkobling
+    leds_conn_waiting();
 	return 0;
 }
 
