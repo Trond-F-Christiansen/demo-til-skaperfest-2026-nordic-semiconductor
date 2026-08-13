@@ -1,0 +1,10 @@
+# Host-side dependencies for the Edge AI games (main.py).
+#
+#   python3 -m venv .venv
+#   source .venv/bin/activate
+#   pip install -r requirements.txt
+#
+# NOTE: a venv is not relocatable -- bin/activate hardcodes its absolute path.
+# If this folder is ever moved or copied, delete .venv and recreate it here.
+pygame~=2.6
+pyserial~=3.5
