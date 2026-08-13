@@ -1,0 +1,14 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+/* Dedicated UART link to the hub's nRF9151, which publishes the highscore
+ * over MQTT. Kept separate from the console UART so controller-command
+ * forwarding on the console is unaffected. Default uart30 pins on this DK are
+ * TX P0.6 / RX P0.7; cross TX<->RX to the nRF9151 and share a ground wire.
+ */
+&uart30 {
+	status = "okay";
+	current-speed = <115200>;
+};
