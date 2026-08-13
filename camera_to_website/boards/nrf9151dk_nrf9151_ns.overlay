@@ -1,0 +1,29 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+/* The Arducam Mega sits on the DK's Arduino SPI header, which the board already
+ * wires up as spi3: SCK P0.13, MISO P0.12, MOSI P0.11, and CS on D10 (P0.10) as
+ * cs-gpios index 0 -- so reg = <0> below picks up the right chip select and no
+ * pinctrl of our own is needed.
+ *
+ * TF-M puts both SPIM3 and GPIO port 0 in the non-secure domain by default (see
+ * target_cfg_53_91.c, NRF_SPIM3_S_BASE / NRF_P0_S_BASE), so this works from the
+ * non-secure image with no secure-side configuration.
+ */
+&spi3 {
+	/* The camera clocks out dummy bytes while its FIFO is being read. The
+	 * SPIM default overrun character is 0xFF, which the camera misreads;
+	 * drive 0x00 instead, matching the nRF54LM20 setup this was ported from.
+	 */
+	overrun-character = <0x00>;
+
+	arducam_mega: arducam-mega@0 {
+		compatible = "arducam,mega";
+		reg = <0>;
+		spi-max-frequency = <8000000>;
+		status = "okay";
+	};
+};

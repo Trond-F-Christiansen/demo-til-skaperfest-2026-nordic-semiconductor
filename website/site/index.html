@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Highscores</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card: #161b22;
+      --border: #262c36;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #0077C7;
+      --accent-hover: #3192D3;
+      --cyan: #00A2C7;
+      --gold: #e3b341;
+      --green: #3fb950;
+      --red: #f85149;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 2rem 1.5rem 3rem;
+    }
+
+    header {
+      max-width: 1100px;
+      margin: 0 auto 2rem;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin: 0 0 0.35rem;
+      letter-spacing: -0.02em;
+    }
+
+    #status {
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-top: 0.5rem;
+    }
+
+    #status.stale { color: var(--gold); }
+    #status.failed { color: var(--red); }
+
+    #mqtt-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-top: 0.25rem;
+    }
+
+    #mqtt-status .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+
+    #mqtt-status .dot-connected { background: var(--cyan); }
+    #mqtt-status .dot-connecting { background: var(--gold); }
+    #mqtt-status .dot-disconnected { background: var(--red); }
+
+    .reset-btn {
+      margin-top: 0.9rem;
+      background: transparent;
+      border: 1px solid var(--red);
+      color: var(--red);
+      border-radius: 6px;
+      padding: 0.35rem 0.8rem;
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .reset-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin: 0 0 0.7rem;
+    }
+
+    .boards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+
+    .board {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+    }
+
+    .board ol {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .board li {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .board li:last-child {
+      border-bottom: none;
+    }
+
+    .rank {
+      width: 1.7rem;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+
+    .board li:first-child .rank {
+      color: var(--gold);
+    }
+
+    .thumb {
+      width: 80px;
+      height: 80px;
+      border-radius: 4px;
+      object-fit: cover;
+      background: #0a0d12;
+      flex-shrink: 0;
+    }
+
+    .score {
+      flex: 1;
+      color: var(--text);
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+
+    .delete-entry {
+      width: 1.5rem;
+      height: 1.5rem;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .delete-entry:hover {
+      background: var(--red);
+      color: #fff;
+    }
+
+    .delete-entry:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .empty-board {
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 0.4rem 0;
+    }
+
+    /* One-time entrance flourish for a row that just appeared, so a new
+     * highscore feels like a reward rather than silently showing up in
+     * a list.
+     */
+    .board li.just-added {
+      animation: celebrate-pop 1.1s ease-out;
+    }
+
+    @keyframes celebrate-pop {
+      0%   { transform: scale(0.85); box-shadow: 0 0 0 0 rgba(0, 119, 199, 0); }
+      30%  { transform: scale(1.05); box-shadow: 0 0 0 8px rgba(0, 119, 199, 0.45); }
+      65%  { box-shadow: 0 0 0 14px rgba(0, 162, 199, 0.15); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 162, 199, 0); }
+    }
+
+    .new-badge {
+      position: absolute;
+      top: -0.6rem;
+      right: 0.5rem;
+      background: linear-gradient(90deg, var(--accent), var(--cyan));
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.55rem;
+      border-radius: 12px;
+      pointer-events: none;
+    }
+
+    .pending-section {
+      max-width: 1100px;
+      margin: 2rem auto 0;
+    }
+
+    .pending-section h2 {
+      color: var(--muted);
+      text-transform: none;
+      letter-spacing: normal;
+      background: none;
+      display: block;
+      padding: 0;
+      font-size: 1rem;
+    }
+
+    #pending-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    #pending-list li {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    #pending-list li:last-child {
+      border-bottom: none;
+    }
+
+    .pending-game {
+      color: var(--muted);
+      font-size: 0.8rem;
+      width: 7rem;
+      flex-shrink: 0;
+    }
+
+    .pending-score {
+      flex: 1;
+      font-weight: 600;
+    }
+
+    .empty-pending {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🏆 Highscores 🏆</h1>
+    <div id="status">Loading&hellip;</div>
+    <div id="mqtt-status"><span class="dot"></span><span class="mqtt-status-text">Connecting to broker&hellip;</span></div>
+    <button id="reset-btn" class="reset-btn">Reset project data</button>
+  </header>
+
+  <main>
+    <div id="boards" class="boards"></div>
+
+    <section class="pending-section">
+      <h2>Waiting for a photo (<span id="pending-count">0</span>)</h2>
+      <ul id="pending-list"></ul>
+    </section>
+  </main>
+
+  <script>
+    const GAMES = { snake: "Snake", minesweeper: "Minesweeper", quiz: "Quiz" };
+
+    const boardsEl = document.getElementById('boards');
+    const statusEl = document.getElementById('status');
+    const mqttStatusEl = document.getElementById('mqtt-status');
+    const mqttDotEl = mqttStatusEl.querySelector('.dot');
+    const mqttStatusTextEl = mqttStatusEl.querySelector('.mqtt-status-text');
+
+    let lastUpdatedAt = null;
+    let lastFetchFailed = false;
+
+    // How old the data can get before the age is highlighted. Deliberately not
+    // called "offline": state.json is only rewritten when something actually
+    // changes, so a quiet backend and a dead one look identical from here. The
+    // age is reported as a fact and left for a human to judge.
+    const STALE_AFTER_SECONDS = 300;
+
+    function formatAge(seconds) {
+      if (seconds < 10) {
+        return 'just now';
+      }
+      if (seconds < 60) {
+        return `${seconds}s ago`;
+      }
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) {
+        return `${minutes} min ago`;
+      }
+      const hours = Math.floor(minutes / 60);
+      return `${hours} h ${minutes % 60} min ago`;
+    }
+
+    // Reports the age of the data itself, not the time of the last fetch - a
+    // successful fetch of an hour-old file is not "updated". updated_at comes
+    // from the backend's clock and Date.now() from this browser's, so clamp at
+    // zero rather than showing a negative age when the two disagree.
+    function renderStatus() {
+      statusEl.classList.remove('stale', 'failed');
+
+      if (lastFetchFailed) {
+        statusEl.textContent = 'Could not load state.json';
+        statusEl.classList.add('failed');
+        return;
+      }
+      if (lastUpdatedAt === null) {
+        statusEl.textContent = 'Loading…';
+        return;
+      }
+
+      const age = Math.max(0, Math.floor(Date.now() / 1000) - lastUpdatedAt);
+      statusEl.textContent = `Last change ${formatAge(age)}`;
+      if (age > STALE_AFTER_SECONDS) {
+        statusEl.classList.add('stale');
+      }
+    }
+
+    // Which entry_ids have already been shown, per game - so a brand new
+    // score can get a celebratory animation while everything already on
+    // the board when the page loaded does not. Populated without
+    // celebrating on the very first render (see loadState).
+    const seenEntryIds = { snake: new Set(), minesweeper: new Set(), quiz: new Set() };
+    let firstRender = true;
+
+    // Separate from #status (which only reports state.json polling) so a
+    // dead/blocked MQTT connection - which silently breaks reset/delete -
+    // stays visible instead of being overwritten by the next successful poll.
+    function setMqttStatus(state, text) {
+      mqttDotEl.className = `dot dot-${state}`;
+      mqttStatusTextEl.textContent = text;
+    }
+
+    function formatScore(game, score) {
+      if (game === 'minesweeper') {
+        const s = Math.round(score);
+        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      }
+      return String(score);
+    }
+
+    function requestDelete(game, entry, button) {
+      const password = prompt('Enter the admin password to remove this score:');
+      if (password === null) {
+        return;
+      }
+      button.disabled = true;
+      mqttClient.publish(
+        'admin/delete',
+        JSON.stringify({ game, entry_id: entry.entry_id, password })
+      );
+      // No direct ack - a wrong password just leaves the row in place, so
+      // re-enable the button after a bit rather than leaving it stuck.
+      setTimeout(() => {
+        button.disabled = false;
+      }, 3000);
+    }
+
+    function requestDeletePending(entry, button) {
+      const password = prompt('Enter the admin password to remove this pending score:');
+      if (password === null) {
+        return;
+      }
+      button.disabled = true;
+      mqttClient.publish(
+        'admin/delete_pending',
+        JSON.stringify({ session_id: entry.session_id, password })
+      );
+      setTimeout(() => {
+        button.disabled = false;
+      }, 3000);
+    }
+
+    function renderPending(pending) {
+      document.getElementById('pending-count').textContent = pending.length;
+      const list = document.getElementById('pending-list');
+      list.innerHTML = '';
+
+      if (pending.length === 0) {
+        const empty = document.createElement('li');
+        empty.className = 'empty-pending';
+        empty.textContent = 'Nothing waiting right now.';
+        list.appendChild(empty);
+        return;
+      }
+
+      pending.forEach((entry) => {
+        const li = document.createElement('li');
+
+        const gameLabel = document.createElement('span');
+        gameLabel.className = 'pending-game';
+        gameLabel.textContent = GAMES[entry.game] || entry.game;
+        li.appendChild(gameLabel);
+
+        const score = document.createElement('span');
+        score.className = 'pending-score';
+        score.textContent = formatScore(entry.game, entry.score);
+        li.appendChild(score);
+
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'delete-entry';
+        del.textContent = '✕';
+        del.title = 'Remove this pending score';
+        del.onclick = () => requestDeletePending(entry, del);
+        li.appendChild(del);
+
+        list.appendChild(li);
+      });
+    }
+
+    function renderBoards(leaderboards) {
+      boardsEl.innerHTML = '';
+      for (const [game, label] of Object.entries(GAMES)) {
+        const rows = leaderboards[game] || [];
+        const seen = seenEntryIds[game];
+
+        // Whichever entry was added most recently (server-side received_at,
+        // not client-side "have I seen this yet") keeps the "New!" badge -
+        // it stays put until a genuinely newer entry replaces it, rather
+        // than fading out on a timer.
+        const latestEntryId = rows.length
+          ? rows.reduce((best, r) => (r.received_at > best.received_at ? r : best), rows[0]).entry_id
+          : null;
+
+        const board = document.createElement('div');
+        board.className = 'board';
+
+        const h2 = document.createElement('h2');
+        h2.textContent = label;
+        board.appendChild(h2);
+
+        if (rows.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'empty-board';
+          empty.textContent = 'No scores yet';
+          board.appendChild(empty);
+        } else {
+          const ol = document.createElement('ol');
+          rows.forEach((row, i) => {
+            const li = document.createElement('li');
+            const isNew = !firstRender && !seen.has(row.entry_id);
+            const isLatest = row.entry_id === latestEntryId;
+            if (isNew) {
+              li.classList.add('just-added');
+            }
+            seen.add(row.entry_id);
+
+            const rank = document.createElement('span');
+            rank.className = 'rank';
+            rank.textContent = String(i + 1);
+            li.appendChild(rank);
+
+            if (row.photo_filename) {
+              const img = document.createElement('img');
+              img.className = 'thumb';
+              img.loading = 'lazy';
+              img.alt = 'Captured photo';
+              img.src = `photos/${encodeURIComponent(row.photo_filename)}`;
+              li.appendChild(img);
+            } else {
+              const spacer = document.createElement('span');
+              spacer.className = 'thumb';
+              li.appendChild(spacer);
+            }
+
+            const score = document.createElement('span');
+            score.className = 'score';
+            score.textContent = formatScore(game, row.score);
+            li.appendChild(score);
+
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'delete-entry';
+            del.textContent = '✕';
+            del.title = 'Remove this score';
+            del.onclick = () => requestDelete(game, row, del);
+            li.appendChild(del);
+
+            if (isLatest) {
+              const badge = document.createElement('span');
+              badge.className = 'new-badge';
+              badge.textContent = '✨ New!';
+              li.appendChild(badge);
+            }
+
+            ol.appendChild(li);
+          });
+          board.appendChild(ol);
+        }
+
+        boardsEl.appendChild(board);
+      }
+      firstRender = false;
+    }
+
+    async function loadState() {
+      try {
+        // `cache: 'no-store'` only stops the local browser cache - it adds no
+        // header that would stop an intermediate proxy/carrier cache from
+        // serving a stale copy to some visitors and not others. A unique
+        // query string every time defeats any cache keyed by URL.
+        const res = await fetch(`state.json?_=${Date.now()}`, { cache: 'no-store' });
+        const data = await res.json();
+
+        if (data.updated_at !== lastUpdatedAt) {
+          lastUpdatedAt = data.updated_at;
+          renderBoards(data.leaderboards || {});
+          renderPending(data.pending || []);
+        }
+
+        lastFetchFailed = false;
+      } catch (err) {
+        lastFetchFailed = true;
+      }
+      renderStatus();
+    }
+
+    const mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+    mqttClient.on('connect', () => {
+      setMqttStatus('connected', 'Connected');
+    });
+    mqttClient.on('reconnect', () => {
+      setMqttStatus('connecting', 'Reconnecting to broker…');
+    });
+    mqttClient.on('close', () => {
+      setMqttStatus('disconnected', 'Disconnected, reset/delete will not go through until this reconnects');
+    });
+    mqttClient.on('offline', () => {
+      setMqttStatus('disconnected', 'Offline, reset/delete will not go through until this reconnects');
+    });
+    mqttClient.on('error', () => {
+      setMqttStatus('disconnected', 'Connection error, reset/delete will not go through');
+    });
+
+    const resetBtn = document.getElementById('reset-btn');
+    resetBtn.onclick = () => {
+      const password = prompt(
+        'Reset all highscores and photos?\n\n' +
+        'Current leaderboards and photos move to a backup folder on the ' +
+        'server (overwriting the previous backup) and the site starts empty.\n\n' +
+        'Enter the admin password to confirm:'
+      );
+      if (password === null) {
+        return;
+      }
+      mqttClient.publish('admin/reset', JSON.stringify({ action: 'reset', password }));
+      resetBtn.disabled = true;
+      resetBtn.textContent = 'Resetting…';
+      setTimeout(() => {
+        resetBtn.disabled = false;
+        resetBtn.textContent = 'Reset project data';
+      }, 3000);
+    };
+
+    loadState();
+    setInterval(loadState, 2000);
+
+    // Tick the age on its own so it keeps counting up between polls, and keeps
+    // counting even while fetches are failing.
+    setInterval(renderStatus, 1000);
+  </script>
+</body>
+</html>

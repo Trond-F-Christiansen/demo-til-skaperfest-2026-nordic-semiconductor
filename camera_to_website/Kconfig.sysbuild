@@ -1,0 +1,11 @@
+#
+# Copyright (c) 2024 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+# This application targets the nRF9151 DK, which reaches the network through its
+# own cellular modem. The upstream sample also carried nRF70 Wi-Fi defaults for a
+# range of other boards; none of them apply here, so they are left out.
+
+source "share/sysbuild/Kconfig"

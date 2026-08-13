@@ -1,0 +1,44 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "Camera"
+
+config LTE_CAMERA_CAMERA_WIDTH
+	int "Capture width"
+	default 128
+	help
+	  Must be an exact width the Arducam Mega supports, paired with
+	  LTE_CAMERA_CAMERA_HEIGHT: 96x96, 128x128, 320x240, 320x320, 640x480,
+	  1280x720, 1600x1200, or the sensor's maximum. Anything else makes
+	  video_set_format() fail with -ENOTSUP. High resolutions do not fit on this
+	  device: the whole JPEG has to fit in
+	  LTE_CAMERA_PAYLOAD_CHANNEL_STRING_MAX_SIZE bytes, which is itself bounded by
+	  the RAM the modem and TF-M leave for the application.
+
+config LTE_CAMERA_CAMERA_HEIGHT
+	int "Capture height"
+	default 128
+	help
+	  See LTE_CAMERA_CAMERA_WIDTH.
+
+config LTE_CAMERA_CAMERA_THREAD_STACK_SIZE
+	int "Thread stack size"
+	default 4096
+	help
+	  The captured image lives in a static buffer rather than on this stack, so
+	  this only has to cover the capture loop and logging.
+
+config LTE_CAMERA_CAMERA_MESSAGE_QUEUE_SIZE
+	int "Message queue size"
+	default 5
+	help
+	  ZBus subscriber message queue size.
+
+module = LTE_CAMERA_CAMERA
+module-str = Camera
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # Camera
