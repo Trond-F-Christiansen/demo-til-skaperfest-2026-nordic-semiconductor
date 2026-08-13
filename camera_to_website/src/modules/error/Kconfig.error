@@ -6,7 +6,7 @@
 
 menu "Error"
 
-config LTE_CAMERA_ERROR_REBOOT_ON_FATAL
+config CAMERA_TO_WEBSITE_ERROR_REBOOT_ON_FATAL
 	bool "Reboot on fatal error"
 	depends on REBOOT
 	default y
@@ -16,7 +16,7 @@ config LTE_CAMERA_ERROR_REBOOT_ON_FATAL
 	  Other parts of the stack will still reboot or not based on
 	  the CONFIG_RESET_ON_FATAL_ERROR option.
 
-module = LTE_CAMERA_ERROR
+module = CAMERA_TO_WEBSITE_ERROR
 module-str = Error
 source "subsys/logging/Kconfig.template.log_config"
 

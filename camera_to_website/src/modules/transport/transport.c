@@ -13,9 +13,9 @@
 #include "client_id.h"
 #include "message_channel.h"
 
-LOG_MODULE_REGISTER(transport, CONFIG_LTE_CAMERA_TRANSPORT_LOG_LEVEL);
+LOG_MODULE_REGISTER(transport, CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_LOG_LEVEL);
 
-ZBUS_SUBSCRIBER_DEFINE(transport, CONFIG_LTE_CAMERA_TRANSPORT_MESSAGE_QUEUE_SIZE);
+ZBUS_SUBSCRIBER_DEFINE(transport, CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_MESSAGE_QUEUE_SIZE);
 
 #define SUBSCRIBE_TOPIC_ID 2469
 
@@ -24,16 +24,16 @@ static void connect_work_fn(struct k_work *work);
 
 static K_WORK_DELAYABLE_DEFINE(connect_work, connect_work_fn);
 
-K_THREAD_STACK_DEFINE(stack_area, CONFIG_LTE_CAMERA_TRANSPORT_WORKQUEUE_STACK_SIZE);
+K_THREAD_STACK_DEFINE(stack_area, CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_WORKQUEUE_STACK_SIZE);
 
 static struct k_work_q transport_queue;
 
 enum module_state { MQTT_CONNECTED, MQTT_DISCONNECTED };
 
-static char client_id[CONFIG_LTE_CAMERA_TRANSPORT_CLIENT_ID_BUFFER_SIZE];
+static char client_id[CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_CLIENT_ID_BUFFER_SIZE];
 
-static uint8_t pub_topic[sizeof(client_id) + sizeof(CONFIG_LTE_CAMERA_TRANSPORT_PUBLISH_TOPIC)];
-static uint8_t sub_topic[sizeof(client_id) + sizeof(CONFIG_LTE_CAMERA_TRANSPORT_SUBSCRIBE_TOPIC)];
+static uint8_t pub_topic[sizeof(client_id) + sizeof(CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_PUBLISH_TOPIC)];
+static uint8_t sub_topic[sizeof(client_id) + sizeof(CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_SUBSCRIBE_TOPIC)];
 
 enum transport_event_type {
 	CONNECTED,
@@ -122,14 +122,14 @@ static int topics_prefix(void)
 	int len;
 
 	len = snprintk(pub_topic, sizeof(pub_topic), "%s/%s", client_id,
-		       CONFIG_LTE_CAMERA_TRANSPORT_PUBLISH_TOPIC);
+		       CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_PUBLISH_TOPIC);
 	if ((len < 0) || (len >= sizeof(pub_topic))) {
 		LOG_ERR("Publish topic buffer too small");
 		return -EMSGSIZE;
 	}
 
 	len = snprintk(sub_topic, sizeof(sub_topic), "%s/%s", client_id,
-		       CONFIG_LTE_CAMERA_TRANSPORT_SUBSCRIBE_TOPIC);
+		       CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_SUBSCRIBE_TOPIC);
 	if ((len < 0) || (len >= sizeof(sub_topic))) {
 		LOG_ERR("Subscribe topic buffer too small");
 		return -EMSGSIZE;
@@ -195,8 +195,8 @@ static void connect_work_fn(struct k_work *work)
 
 	int err;
 	struct mqtt_helper_conn_params conn_params = {
-		.hostname.ptr = CONFIG_LTE_CAMERA_TRANSPORT_BROKER_HOSTNAME,
-		.hostname.size = strlen(CONFIG_LTE_CAMERA_TRANSPORT_BROKER_HOSTNAME),
+		.hostname.ptr = CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_BROKER_HOSTNAME,
+		.hostname.size = strlen(CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_BROKER_HOSTNAME),
 		.device_id.ptr = client_id,
 		.device_id.size = strlen(client_id),
 	};
@@ -221,7 +221,7 @@ static void connect_work_fn(struct k_work *work)
 	}
 
 	k_work_reschedule_for_queue(&transport_queue, &connect_work,
-			  K_SECONDS(CONFIG_LTE_CAMERA_TRANSPORT_RECONNECTION_TIMEOUT_SECONDS));
+			  K_SECONDS(CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_RECONNECTION_TIMEOUT_SECONDS));
 }
 
 static void disconnected_entry(void *o)
@@ -251,7 +251,7 @@ static enum smf_state_result disconnected_run(void *o)
 static void connected_entry(void *o)
 {
 	LOG_INF("Connected to MQTT broker");
-	LOG_INF("Hostname: %s", CONFIG_LTE_CAMERA_TRANSPORT_BROKER_HOSTNAME);
+	LOG_INF("Hostname: %s", CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_BROKER_HOSTNAME);
 	LOG_INF("Client ID: %s", client_id);
 	LOG_INF("Port: %d", CONFIG_MQTT_HELPER_PORT);
 	LOG_INF("TLS: %s", IS_ENABLED(CONFIG_MQTT_LIB_TLS) ? "Yes" : "No");
@@ -390,5 +390,5 @@ static void transport_task(void)
 }
 
 K_THREAD_DEFINE(transport_task_id,
-		CONFIG_LTE_CAMERA_TRANSPORT_THREAD_STACK_SIZE,
+		CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_THREAD_STACK_SIZE,
 		transport_task, NULL, NULL, NULL, 3, 0, 0);

@@ -28,13 +28,13 @@ west flash
 
 ## Configuration
 
-App options use the `LTE_CAMERA_` prefix, in `prj.conf`:
+App options use the `CAMERA_TO_WEBSITE_` prefix, in `prj.conf`:
 
 ```
-CONFIG_LTE_CAMERA_CAMERA_WIDTH=320
-CONFIG_LTE_CAMERA_CAMERA_HEIGHT=320
-CONFIG_LTE_CAMERA_PAYLOAD_CHANNEL_STRING_MAX_SIZE=16384
-CONFIG_LTE_CAMERA_TRANSPORT_BROKER_HOSTNAME="broker.hivemq.com"
+CONFIG_CAMERA_TO_WEBSITE_CAMERA_WIDTH=320
+CONFIG_CAMERA_TO_WEBSITE_CAMERA_HEIGHT=320
+CONFIG_CAMERA_TO_WEBSITE_PAYLOAD_CHANNEL_STRING_MAX_SIZE=16384
+CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_BROKER_HOSTNAME="broker.hivemq.com"
 ```
 
 Resolution must be an **exact pair** the sensor supports, 96x96, 128x128,
@@ -89,7 +89,7 @@ backend substitutes a random stand-in image.
 
 ## MQTT
 
-Client ID is the modem's **IMEI** (`CONFIG_LTE_CAMERA_TRANSPORT_CLIENT_ID` is
+Client ID is the modem's **IMEI** (`CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_CLIENT_ID` is
 empty, so `hw_id_get()` supplies it). Publishes to `<IMEI>/my/publish/topic`; the
 subscriber uses a `+` wildcard so nothing needs configuring per device.
 

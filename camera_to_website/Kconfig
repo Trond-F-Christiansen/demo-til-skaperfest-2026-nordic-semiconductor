@@ -6,7 +6,7 @@
 
 menu "MQTT sample"
 
-config LTE_CAMERA_PAYLOAD_CHANNEL_STRING_MAX_SIZE
+config CAMERA_TO_WEBSITE_PAYLOAD_CHANNEL_STRING_MAX_SIZE
 	int "Payload maximum string size"
 	default 100
 	help

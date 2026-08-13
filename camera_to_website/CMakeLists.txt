@@ -26,4 +26,4 @@ add_subdirectory(src/modules/transport)
 add_subdirectory(src/modules/error)
 
 # Optional modules
-add_subdirectory_ifdef(CONFIG_LTE_CAMERA_LED src/modules/led)
+add_subdirectory_ifdef(CONFIG_CAMERA_TO_WEBSITE_LED src/modules/led)

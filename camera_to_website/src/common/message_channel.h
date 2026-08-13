@@ -24,7 +24,7 @@ extern "C" {
 	}
 
 struct payload {
-	uint8_t data[CONFIG_LTE_CAMERA_PAYLOAD_CHANNEL_STRING_MAX_SIZE];
+	uint8_t data[CONFIG_CAMERA_TO_WEBSITE_PAYLOAD_CHANNEL_STRING_MAX_SIZE];
 	size_t len;
 };
 

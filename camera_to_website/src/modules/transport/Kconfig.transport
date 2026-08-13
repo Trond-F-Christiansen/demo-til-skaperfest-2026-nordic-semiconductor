@@ -8,33 +8,33 @@ menu "Transport"
 	depends on MQTT_HELPER
 	depends on HW_ID_LIBRARY
 
-config LTE_CAMERA_TRANSPORT_RECONNECTION_TIMEOUT_SECONDS
+config CAMERA_TO_WEBSITE_TRANSPORT_RECONNECTION_TIMEOUT_SECONDS
 	int "Reconnection timeout in seconds"
 	default 60
 	help
 	  Time in between reconnection attempts to the MQTT broker.
 
-config LTE_CAMERA_TRANSPORT_THREAD_STACK_SIZE
+config CAMERA_TO_WEBSITE_TRANSPORT_THREAD_STACK_SIZE
 	int "Thread stack size"
 	default 2048
 
-config LTE_CAMERA_TRANSPORT_MESSAGE_QUEUE_SIZE
+config CAMERA_TO_WEBSITE_TRANSPORT_MESSAGE_QUEUE_SIZE
 	int "Message queue size"
 	default 5
 	help
 	  ZBus subscriber message queue size.
 
-config LTE_CAMERA_TRANSPORT_WORKQUEUE_STACK_SIZE
+config CAMERA_TO_WEBSITE_TRANSPORT_WORKQUEUE_STACK_SIZE
 	int "Workqueue stack size"
 	default 4096
 	help
 	  Stack size of the module's internal workqueue.
 
-config LTE_CAMERA_TRANSPORT_BROKER_HOSTNAME
+config CAMERA_TO_WEBSITE_TRANSPORT_BROKER_HOSTNAME
 	string "MQTT broker hostname"
 	default "test.mosquitto.org"
 
-config LTE_CAMERA_TRANSPORT_CLIENT_ID
+config CAMERA_TO_WEBSITE_TRANSPORT_CLIENT_ID
 	string "MQTT Client ID"
 	default ""
 	help
@@ -42,21 +42,21 @@ config LTE_CAMERA_TRANSPORT_CLIENT_ID
 	  modem's IMEI number for nRF91 Series devices, MAC address for nRF7 Series devices,
 	  or a random number for Native Sim.
 
-config LTE_CAMERA_TRANSPORT_CLIENT_ID_BUFFER_SIZE
+config CAMERA_TO_WEBSITE_TRANSPORT_CLIENT_ID_BUFFER_SIZE
 	int "MQTT Client ID buffer size"
 	default 50
 	help
 	  Size of buffer used to store the MQTT client ID.
 
-config LTE_CAMERA_TRANSPORT_PUBLISH_TOPIC
+config CAMERA_TO_WEBSITE_TRANSPORT_PUBLISH_TOPIC
 	string "MQTT publish topic"
 	default "my/publish/topic"
 
-config LTE_CAMERA_TRANSPORT_SUBSCRIBE_TOPIC
+config CAMERA_TO_WEBSITE_TRANSPORT_SUBSCRIBE_TOPIC
 	string "MQTT subscribe topic"
 	default "my/subscribe/topic"
 
-module = LTE_CAMERA_TRANSPORT
+module = CAMERA_TO_WEBSITE_TRANSPORT
 module-str = Transport
 source "subsys/logging/Kconfig.template.log_config"
 

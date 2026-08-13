@@ -7,11 +7,11 @@
 menu "Network"
 	depends on NRF_MODEM_LIB_NET_IF || WIFI_NRF70 || BOARD_NATIVE_SIM
 
-config LTE_CAMERA_NETWORK_THREAD_STACK_SIZE
+config CAMERA_TO_WEBSITE_NETWORK_THREAD_STACK_SIZE
 	int "Thread stack size"
 	default 4096
 
-module = LTE_CAMERA_NETWORK
+module = CAMERA_TO_WEBSITE_NETWORK
 module-str = Network
 source "subsys/logging/Kconfig.template.log_config"
 

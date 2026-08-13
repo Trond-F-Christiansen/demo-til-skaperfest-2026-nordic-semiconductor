@@ -13,7 +13,7 @@
 
 #include "message_channel.h"
 
-LOG_MODULE_REGISTER(trigger, CONFIG_LTE_CAMERA_TRIGGER_LOG_LEVEL);
+LOG_MODULE_REGISTER(trigger, CONFIG_CAMERA_TO_WEBSITE_TRIGGER_LOG_LEVEL);
 
 static void message_send(enum trigger_type type)
 {
@@ -53,5 +53,5 @@ static void trigger_task(void)
 }
 
 K_THREAD_DEFINE(trigger_task_id,
-		CONFIG_LTE_CAMERA_TRIGGER_THREAD_STACK_SIZE,
+		CONFIG_CAMERA_TO_WEBSITE_TRIGGER_THREAD_STACK_SIZE,
 		trigger_task, NULL, NULL, NULL, 3, 0, 0);

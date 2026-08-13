@@ -11,7 +11,7 @@
 
 #include "message_channel.h"
 
-LOG_MODULE_REGISTER(led, CONFIG_LTE_CAMERA_LED_LOG_LEVEL);
+LOG_MODULE_REGISTER(led, CONFIG_CAMERA_TO_WEBSITE_LED_LOG_LEVEL);
 
 const static struct device *led_device = DEVICE_DT_GET_ANY(gpio_leds);
 

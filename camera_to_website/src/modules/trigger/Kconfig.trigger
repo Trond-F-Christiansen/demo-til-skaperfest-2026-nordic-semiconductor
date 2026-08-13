@@ -6,11 +6,11 @@
 
 menu "Trigger"
 
-config LTE_CAMERA_TRIGGER_THREAD_STACK_SIZE
+config CAMERA_TO_WEBSITE_TRIGGER_THREAD_STACK_SIZE
 	int "Thread stack size"
 	default 512
 
-module = LTE_CAMERA_TRIGGER
+module = CAMERA_TO_WEBSITE_TRIGGER
 module-str = Trigger
 source "subsys/logging/Kconfig.template.log_config"
 
