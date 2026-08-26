@@ -1,3 +1,4 @@
+.vscode/
 # West / Zephyr build output
 build/
 build*/

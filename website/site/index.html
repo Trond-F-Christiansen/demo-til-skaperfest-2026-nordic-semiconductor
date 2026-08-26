@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Highscores</title>
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -55,28 +54,6 @@
 
     #status.stale { color: var(--gold); }
     #status.failed { color: var(--red); }
-
-    #mqtt-status {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.4rem;
-      color: var(--muted);
-      font-size: 0.78rem;
-      margin-top: 0.25rem;
-    }
-
-    #mqtt-status .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--muted);
-      flex-shrink: 0;
-    }
-
-    #mqtt-status .dot-connected { background: var(--cyan); }
-    #mqtt-status .dot-connecting { background: var(--gold); }
-    #mqtt-status .dot-disconnected { background: var(--red); }
 
     .reset-btn {
       margin-top: 0.9rem;
@@ -287,7 +264,6 @@
   <header>
     <h1>🏆 Highscores 🏆</h1>
     <div id="status">Loading&hellip;</div>
-    <div id="mqtt-status"><span class="dot"></span><span class="mqtt-status-text">Connecting to broker&hellip;</span></div>
     <button id="reset-btn" class="reset-btn">Reset project data</button>
   </header>
 
@@ -305,10 +281,6 @@
 
     const boardsEl = document.getElementById('boards');
     const statusEl = document.getElementById('status');
-    const mqttStatusEl = document.getElementById('mqtt-status');
-    const mqttDotEl = mqttStatusEl.querySelector('.dot');
-    const mqttStatusTextEl = mqttStatusEl.querySelector('.mqtt-status-text');
-
     let lastUpdatedAt = null;
     let lastFetchFailed = false;
 
@@ -364,14 +336,6 @@
     const seenEntryIds = { snake: new Set(), minesweeper: new Set(), quiz: new Set() };
     let firstRender = true;
 
-    // Separate from #status (which only reports state.json polling) so a
-    // dead/blocked MQTT connection - which silently breaks reset/delete -
-    // stays visible instead of being overwritten by the next successful poll.
-    function setMqttStatus(state, text) {
-      mqttDotEl.className = `dot dot-${state}`;
-      mqttStatusTextEl.textContent = text;
-    }
-
     function formatScore(game, score) {
       if (game === 'minesweeper') {
         const s = Math.round(score);
@@ -386,15 +350,13 @@
         return;
       }
       button.disabled = true;
-      mqttClient.publish(
-        'admin/delete',
-        JSON.stringify({ game, entry_id: entry.entry_id, password })
-      );
-      // No direct ack - a wrong password just leaves the row in place, so
-      // re-enable the button after a bit rather than leaving it stuck.
-      setTimeout(() => {
+      fetch('/api/admin/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ game, entry_id: entry.entry_id, password }),
+      }).then(loadState).finally(() => {
         button.disabled = false;
-      }, 3000);
+      });
     }
 
     function requestDeletePending(entry, button) {
@@ -403,13 +365,13 @@
         return;
       }
       button.disabled = true;
-      mqttClient.publish(
-        'admin/delete_pending',
-        JSON.stringify({ session_id: entry.session_id, password })
-      );
-      setTimeout(() => {
+      fetch('/api/admin/delete-pending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: entry.session_id, password }),
+      }).then(loadState).finally(() => {
         button.disabled = false;
-      }, 3000);
+      });
     }
 
     function renderPending(pending) {
@@ -541,7 +503,10 @@
         // header that would stop an intermediate proxy/carrier cache from
         // serving a stale copy to some visitors and not others. A unique
         // query string every time defeats any cache keyed by URL.
-        const res = await fetch(`state.json?_=${Date.now()}`, { cache: 'no-store' });
+        const res = await fetch('/api/state', { cache: 'no-store' });
+        if (!res.ok) {
+          throw new Error(`State request failed: ${res.status}`);
+        }
         const data = await res.json();
 
         if (data.updated_at !== lastUpdatedAt) {
@@ -557,23 +522,6 @@
       renderStatus();
     }
 
-    const mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
-    mqttClient.on('connect', () => {
-      setMqttStatus('connected', 'Connected');
-    });
-    mqttClient.on('reconnect', () => {
-      setMqttStatus('connecting', 'Reconnecting to broker…');
-    });
-    mqttClient.on('close', () => {
-      setMqttStatus('disconnected', 'Disconnected, reset/delete will not go through until this reconnects');
-    });
-    mqttClient.on('offline', () => {
-      setMqttStatus('disconnected', 'Offline, reset/delete will not go through until this reconnects');
-    });
-    mqttClient.on('error', () => {
-      setMqttStatus('disconnected', 'Connection error, reset/delete will not go through');
-    });
-
     const resetBtn = document.getElementById('reset-btn');
     resetBtn.onclick = () => {
       const password = prompt(
@@ -585,13 +533,16 @@
       if (password === null) {
         return;
       }
-      mqttClient.publish('admin/reset', JSON.stringify({ action: 'reset', password }));
       resetBtn.disabled = true;
       resetBtn.textContent = 'Resetting…';
-      setTimeout(() => {
+      fetch('/api/admin/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset', password }),
+      }).then(loadState).finally(() => {
         resetBtn.disabled = false;
         resetBtn.textContent = 'Reset project data';
-      }, 3000);
+      });
     };
 
     loadState();
