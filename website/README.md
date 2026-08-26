@@ -1,31 +1,33 @@
 # Website
 
 The website is a single HTTP service. It serves the scoreboard and receives
-HTTPS uploads from the camera and game hub; MQTT is not used.
+HTTPS score uploads from the game hub; MQTT is not used. Every accepted score
+receives a random image from `backend/anon_photos/`.
 
 ```text
-camera --- HTTPS POST /api/photos ---\
-hub ------ HTTPS POST /api/scores ---+--> website service
-browser -- HTTPS GET/POST ------------/    |
-                                             +-- state and photos on disk
+hub ------ HTTPS POST /api/scores ----> website service
+browser -- HTTPS GET/POST ------------> |
+                                      +-- random photos and state on disk
 ```
 
 ## API
 
 | Route | Caller | Request |
 | --- | --- | --- |
-| `POST /api/photos` | Camera | JPEG body and device bearer token |
 | `POST /api/scores/<game>` | Hub | Score JSON and device bearer token |
 | `GET /api/state` | Browser | Current leaderboard and pending queue |
 | `POST /api/admin/delete` | Browser | Entry and admin password |
-| `POST /api/admin/delete-pending` | Browser | Session and admin password |
 | `POST /api/admin/reset` | Browser | Admin password |
 
 Scores use the existing JSON payload:
 
 ```json
-{"session_id":"snake-0","score":1200}
+{"score":1200}
 ```
+
+The available game IDs are `snake_voice` for __Snake (stemme)__,
+`snake_geusture` for __Snake (bevegelse)__, and `minesweeper` for
+__Minesweeper__.
 
 ## Local Run
 
@@ -64,29 +66,28 @@ fly secrets set DEVICE_API_TOKEN='choose-a-device-token'
 fly deploy
 ```
 
-The Fly volume mounts at `/data`. It stores the page, state, photos, and backup;
-do not scale beyond one Machine because the pending queue is process-local.
+The Fly volume mounts at `/data`. It stores the page, state, photos, and backup.
+Run one Machine because the application uses a local filesystem volume.
 
 ## Firmware Configuration
 
-Both nRF9151 applications now use HTTPS POST over port `443`.
+The game hub uses HTTPS POST over port `443`.
 
-Set the Fly hostname and the same device token in the application configuration:
+Set the Fly hostname and device token in the hub application configuration:
 
 ```text
-CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_HOSTNAME="<app>.fly.dev"
-CONFIG_CAMERA_TO_WEBSITE_TRANSPORT_DEVICE_TOKEN="<device-token>"
 CONFIG_MQTT_SAMPLE_TRANSPORT_HOSTNAME="<app>.fly.dev"
 CONFIG_MQTT_SAMPLE_TRANSPORT_DEVICE_TOKEN="<device-token>"
 ```
 
 The modem security tag must contain a CA certificate that trusts the Fly
 certificate for `<app>.fly.dev`. The default security tag is `955`. Provision
-the CA certificate before flashing the camera or hub firmware.
+the CA certificate before flashing the hub firmware.
 
-## Pairing Rules
+## Scoring Rules
 
-Snake and Quiz rank high-to-low; Minesweeper ranks low-to-high. Qualifying
-scores wait in FIFO order for the next photo. A photo with no pending score is
-discarded.
-Expired scores are added without a photo when a later request arrives.
+Every valid score is added immediately. The last submitted score appears first
+without a rank and is highlighted. Older Snake and Quiz scores rank high-to-low;
+older Minesweeper scores rank low-to-high. Scores receive a randomly chosen
+bundled image and an anonymous two-word player alias. Camera photo uploads are
+ignored.

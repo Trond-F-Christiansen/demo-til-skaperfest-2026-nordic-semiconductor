@@ -22,13 +22,32 @@ BACKUP_PHOTOS_DIR = BACKUP_DIR / "photos"
 
 STATE_FILENAME = "state.json"
 
-ANON_PHOTO_MARKER = b"ANON_PHOTO_REQUEST"
 ANON_PHOTOS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "anon_photos")
 
-GAMES = {"snake": "desc", "minesweeper": "asc", "quiz": "desc"}
+GAMES = {
+    "snake_voice": "desc",
+    "snake_geusture": "desc",
+    "minesweeper": "asc",
+}
 LEADERBOARD_SIZE = int(os.environ.get("LEADERBOARD_SIZE", 50))
 
-AWAITING_PHOTO_EXPIRY_SECONDS = int(os.environ.get("AWAITING_PHOTO_EXPIRY_SECONDS", 300))
+ALIAS_PREFIXES = (
+    "blå", "brisk", "diger", "drøm", "dyp", "fager", "fjell", "flink",
+    "fløyel", "frost", "frisk", "fugl", "fyrig", "glad", "glitrende", "gnistrende",
+    "gull", "grønn", "gyllen", "hav", "hemmelig", "hvit", "klar", "klok",
+    "kvik", "liten", "lunar", "lys", "magisk", "mjuk", "modig", "morgen",
+    "mørk", "nord", "ny", "rask", "regn", "rolig", "rød", "rund",
+    "safir", "sjarmerende", "skog", "sol", "spretten", "stille", "storm", "stødig",
+    "sølv", "tidlig", "trygg", "varm", "vennlig", "vinter", "vill", "våt", "øy",
+)
+ALIAS_SUFFIXES = (
+    "anemone", "bjelle", "bjørn", "bølge", "bregne", "eik", "elg", "falk",
+    "fjær", "fjord", "furu", "glimt", "gran", "hare", "havn", "hval",
+    "iskrystall", "katt", "klippe", "kråke", "lønn", "lyn", "måne", "mose",
+    "nype", "orm", "perle", "pil", "ravn", "rev", "ring", "rose", "seil",
+    "sjø", "skjær", "sky", "skog", "sol", "stein", "stjerne", "strand",
+    "strå", "svane", "tind", "troll", "trost", "ulv", "varde", "vind", "åre",
+)
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 DEVICE_API_TOKEN = os.environ.get("DEVICE_API_TOKEN")
@@ -37,7 +56,6 @@ HTTP_PORT = int(os.environ.get("PORT", 8000))
 MAX_REQUEST_BYTES = int(os.environ.get("MAX_REQUEST_BYTES", 1024 * 1024))
 
 leaderboards = {game: [] for game in GAMES}
-awaiting_photo = deque()  # {session_id, game, score, queued_at}, oldest first
 state_lock = Lock()
 state_updated_at = 0
 
@@ -46,7 +64,7 @@ def ensure_output_dirs():
     WEBSITE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     source_index = STATIC_SOURCE_DIR / "index.html"
     destination_index = WEBSITE_OUTPUT_DIR / "index.html"
-    if source_index != destination_index and not destination_index.exists():
+    if source_index != destination_index:
         shutil.copyfile(source_index, destination_index)
     PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
@@ -83,7 +101,9 @@ def download_state():
             entries = data.get("leaderboards", {}).get(game, [])
             for entry in entries:
                 entry.setdefault("entry_id", secrets.token_hex(8))
-            leaderboards[game] = entries
+                entry.setdefault("player_alias", new_player_alias())
+                entry.setdefault("received_at", 0)
+            leaderboards[game] = sort_leaderboard(game, entries)
         print(f"Loaded existing state: "
               f"{sum(len(v) for v in leaderboards.values())} leaderboard entries")
         return True
@@ -98,13 +118,9 @@ def save_state():
     destination = WEBSITE_OUTPUT_DIR / STATE_FILENAME
     temporary = destination.with_name(f".{destination.name}.tmp")
     state_updated_at = int(time.time())
-    pending = [
-        {"session_id": e["session_id"], "game": e["game"], "score": e["score"]}
-        for e in awaiting_photo
-    ]
     with temporary.open("w") as f:
         json.dump(
-            {"updated_at": state_updated_at, "leaderboards": leaderboards, "pending": pending},
+            {"updated_at": state_updated_at, "leaderboards": leaderboards},
             f,
         )
     temporary.replace(destination)
@@ -114,22 +130,34 @@ def new_photo_filename():
     return secrets.token_hex(8) + ".jpg"
 
 
+def new_player_alias():
+    return f"{random.choice(ALIAS_PREFIXES)}-{random.choice(ALIAS_SUFFIXES)}"
+
+
 def would_make_leaderboard(game, score):
-    board = leaderboards[game]
-    if len(board) < LEADERBOARD_SIZE:
-        return True
-    worst = board[-1]["score"]
-    return score > worst if GAMES[game] == "desc" else score < worst
+    del game, score
+    return True
 
 
-def add_to_leaderboard(game, score, photo_filename):
+def sort_leaderboard(game, entries):
+    if not entries:
+        return []
+
+    newest = max(entries, key=lambda row: row["received_at"])
+    older_entries = [entry for entry in entries if entry is not newest]
+    older_entries.sort(key=lambda row: row["score"], reverse=(GAMES[game] == "desc"))
+    return [newest, *older_entries]
+
+
+def add_to_leaderboard(game, score, photo_filename, player_alias):
     leaderboards[game].append({
         "entry_id": secrets.token_hex(8),
+        "player_alias": player_alias,
         "score": score,
         "photo_filename": photo_filename,
-        "received_at": int(time.time()),
+        "received_at": time.time_ns(),
     })
-    leaderboards[game].sort(key=lambda row: row["score"], reverse=(GAMES[game] == "desc"))
+    leaderboards[game] = sort_leaderboard(game, leaderboards[game])
     dropped = leaderboards[game][LEADERBOARD_SIZE:]
     leaderboards[game] = leaderboards[game][:LEADERBOARD_SIZE]
 
@@ -139,19 +167,6 @@ def add_to_leaderboard(game, score, photo_filename):
                 move_photo_to_backup(entry["photo_filename"])
 
 
-def check_expired_awaiting_photo():
-    now = time.time()
-    expired_any = False
-    while awaiting_photo and now - awaiting_photo[0]["queued_at"] > AWAITING_PHOTO_EXPIRY_SECONDS:
-        entry = awaiting_photo.popleft()
-        add_to_leaderboard(entry["game"], entry["score"], None)
-        print(f"Pending {entry['game']} score {entry['score']} ({entry['session_id']}) expired, "
-              f"added to the leaderboard without a photo ({len(awaiting_photo)} still pending)")
-        expired_any = True
-    if expired_any:
-        save_state()
-
-
 def handle_score(game, payload):
     if game not in GAMES:
         print(f"Unknown game '{game}', ignoring")
@@ -159,7 +174,6 @@ def handle_score(game, payload):
 
     try:
         data = json.loads(payload)
-        session_id = str(data["session_id"])
         score = data["score"]
         if not isinstance(score, (int, float)) or isinstance(score, bool):
             raise ValueError("score must be a number")
@@ -167,25 +181,18 @@ def handle_score(game, payload):
         print("Malformed score message, ignoring")
         return False
 
-    if not would_make_leaderboard(game, score):
-        print(f"{game} score {score} ({session_id}) doesn't make the top "
-              f"{LEADERBOARD_SIZE}, ignoring")
+    photo_payload = pick_anon_photo()
+    if photo_payload is None:
+        print(f"No random photos found in {ANON_PHOTOS_DIR}, ignoring score")
         return False
 
-    if any(e["session_id"] == session_id for e in awaiting_photo):
-        print(f"session_id {session_id} is already pending, ignoring duplicate score "
-              f"message (session_id must be unique per round)")
-        return False
+    filename = new_photo_filename()
+    with (PHOTOS_DIR / filename).open("wb") as f:
+        f.write(photo_payload)
 
-    awaiting_photo.append({
-        "session_id": session_id,
-        "game": game,
-        "score": score,
-        "queued_at": time.time(),
-    })
+    add_to_leaderboard(game, score, filename, new_player_alias())
     save_state()
-    print(f"{game} score {score} ({session_id}) qualifies, now pending a photo "
-          f"({len(awaiting_photo)} pending)")
+    print(f"Added {game} score {score} with a random photo")
     return True
 
 
@@ -202,32 +209,9 @@ def pick_anon_photo():
 
 
 def handle_photo(payload):
-    check_expired_awaiting_photo()
-
-    if not awaiting_photo:
-        print("Photo arrived but nothing is pending, discarding")
-        return False
-
-    if payload == ANON_PHOTO_MARKER:
-        anon_payload = pick_anon_photo()
-        if anon_payload is None:
-            print(f"Anonymous photo requested but {ANON_PHOTOS_DIR} has no photos, discarding")
-            return False
-        print("Anonymous photo requested, using a random placeholder instead")
-        payload = anon_payload
-
-    entry = awaiting_photo.popleft()
-    filename = new_photo_filename()
-
-    photo_path = PHOTOS_DIR / filename
-    with photo_path.open("wb") as f:
-        f.write(payload)
-
-    add_to_leaderboard(entry["game"], entry["score"], filename)
-    save_state()
-    print(f"Added {entry['game']} score {entry['score']} ({entry['session_id']}) to the "
-          f"leaderboard ({len(awaiting_photo)} still pending)")
-    return True
+    del payload
+    print("Camera photo ignored; scores always receive a random bundled image")
+    return False
 
 
 def handle_delete(payload):
@@ -263,31 +247,6 @@ def handle_delete(payload):
     return True
 
 
-def handle_delete_pending(payload):
-    try:
-        data = json.loads(payload)
-        session_id = str(data["session_id"])
-        password = str(data["password"])
-    except (json.JSONDecodeError, KeyError, TypeError):
-        print(f"Malformed delete-pending message: {payload!r}, ignoring")
-        return False
-
-    if ADMIN_PASSWORD is None or password != ADMIN_PASSWORD:
-        print(f"Delete-pending request for {session_id} had a wrong or missing password, ignoring")
-        return False
-
-    match = next((e for e in awaiting_photo if e["session_id"] == session_id), None)
-    if match is None:
-        print(f"Delete-pending request for unknown session_id {session_id}, ignoring")
-        return False
-
-    awaiting_photo.remove(match)
-    save_state()
-    print(f"Deleted pending {match['game']} score {match['score']} ({session_id}), "
-          f"{len(awaiting_photo)} pending remain")
-    return True
-
-
 def handle_reset(payload):
     try:
         data = json.loads(payload)
@@ -312,7 +271,6 @@ def handle_reset(payload):
 
     for game in GAMES:
         leaderboards[game] = []
-    awaiting_photo.clear()
 
     save_state()
     print("Reset: moved current photos/state.json into backup/, cleared live leaderboards")
@@ -354,10 +312,6 @@ class WebsiteHandler(SimpleHTTPRequestHandler):
                 self.send_json(HTTPStatus.OK, {
                     "updated_at": state_updated_at,
                     "leaderboards": leaderboards,
-                    "pending": [
-                        {"session_id": entry["session_id"], "game": entry["game"], "score": entry["score"]}
-                        for entry in awaiting_photo
-                    ],
                 })
             return
         super().do_GET()
@@ -389,7 +343,6 @@ class WebsiteHandler(SimpleHTTPRequestHandler):
 
         handlers = {
             "/api/admin/delete": handle_delete,
-            "/api/admin/delete-pending": handle_delete_pending,
             "/api/admin/reset": handle_reset,
         }
         handler = handlers.get(path)

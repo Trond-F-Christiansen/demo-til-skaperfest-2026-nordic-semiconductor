@@ -115,6 +115,18 @@
       border-bottom: 1px solid var(--border);
     }
 
+    .board li.latest-entry {
+      background: #bfe3ff;
+      color: #0d1117;
+      margin: 0 -0.35rem;
+      padding: 0.5rem 0.35rem;
+      border-radius: 4px;
+    }
+
+    .board li.latest-entry .score {
+      color: #0d1117;
+    }
+
     .board li:last-child {
       border-bottom: none;
     }
@@ -145,6 +157,12 @@
       color: var(--text);
       font-size: 1.3rem;
       font-weight: 600;
+    }
+
+    .player-alias {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 500;
     }
 
     .delete-entry {
@@ -206,58 +224,6 @@
       pointer-events: none;
     }
 
-    .pending-section {
-      max-width: 1100px;
-      margin: 2rem auto 0;
-    }
-
-    .pending-section h2 {
-      color: var(--muted);
-      text-transform: none;
-      letter-spacing: normal;
-      background: none;
-      display: block;
-      padding: 0;
-      font-size: 1rem;
-    }
-
-    #pending-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-    }
-
-    #pending-list li {
-      display: flex;
-      align-items: center;
-      gap: 0.7rem;
-      padding: 0.5rem 1rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    #pending-list li:last-child {
-      border-bottom: none;
-    }
-
-    .pending-game {
-      color: var(--muted);
-      font-size: 0.8rem;
-      width: 7rem;
-      flex-shrink: 0;
-    }
-
-    .pending-score {
-      flex: 1;
-      font-weight: 600;
-    }
-
-    .empty-pending {
-      color: var(--muted);
-      font-size: 0.85rem;
-    }
   </style>
 </head>
 <body>
@@ -269,15 +235,14 @@
 
   <main>
     <div id="boards" class="boards"></div>
-
-    <section class="pending-section">
-      <h2>Waiting for a photo (<span id="pending-count">0</span>)</h2>
-      <ul id="pending-list"></ul>
-    </section>
   </main>
 
   <script>
-    const GAMES = { snake: "Snake", minesweeper: "Minesweeper", quiz: "Quiz" };
+    const GAMES = {
+      snake_voice: '🐍 Snake (stemme)',
+      snake_geusture: '🐍 Snake (bevegelse)',
+      minesweeper: '💣 Minesweeper',
+    };
 
     const boardsEl = document.getElementById('boards');
     const statusEl = document.getElementById('status');
@@ -292,17 +257,17 @@
 
     function formatAge(seconds) {
       if (seconds < 10) {
-        return 'just now';
+        return 'akkurat nå';
       }
       if (seconds < 60) {
-        return `${seconds}s ago`;
+        return `${seconds} sek siden`;
       }
       const minutes = Math.floor(seconds / 60);
       if (minutes < 60) {
-        return `${minutes} min ago`;
+        return `${minutes} min siden`;
       }
       const hours = Math.floor(minutes / 60);
-      return `${hours} h ${minutes % 60} min ago`;
+      return `${hours} t ${minutes % 60} min siden`;
     }
 
     // Reports the age of the data itself, not the time of the last fetch - a
@@ -313,17 +278,17 @@
       statusEl.classList.remove('stale', 'failed');
 
       if (lastFetchFailed) {
-        statusEl.textContent = 'Could not load state.json';
+        statusEl.textContent = 'Kunne ikke laste state.json';
         statusEl.classList.add('failed');
         return;
       }
       if (lastUpdatedAt === null) {
-        statusEl.textContent = 'Loading…';
+        statusEl.textContent = 'Laster…';
         return;
       }
 
       const age = Math.max(0, Math.floor(Date.now() / 1000) - lastUpdatedAt);
-      statusEl.textContent = `Last change ${formatAge(age)}`;
+      statusEl.textContent = `Siste resultat ${formatAge(age)}`;
       if (age > STALE_AFTER_SECONDS) {
         statusEl.classList.add('stale');
       }
@@ -333,7 +298,11 @@
     // score can get a celebratory animation while everything already on
     // the board when the page loaded does not. Populated without
     // celebrating on the very first render (see loadState).
-    const seenEntryIds = { snake: new Set(), minesweeper: new Set(), quiz: new Set() };
+    const seenEntryIds = {
+      snake_voice: new Set(),
+      snake_geusture: new Set(),
+      minesweeper: new Set(),
+    };
     let firstRender = true;
 
     function formatScore(game, score) {
@@ -356,59 +325,6 @@
         body: JSON.stringify({ game, entry_id: entry.entry_id, password }),
       }).then(loadState).finally(() => {
         button.disabled = false;
-      });
-    }
-
-    function requestDeletePending(entry, button) {
-      const password = prompt('Enter the admin password to remove this pending score:');
-      if (password === null) {
-        return;
-      }
-      button.disabled = true;
-      fetch('/api/admin/delete-pending', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: entry.session_id, password }),
-      }).then(loadState).finally(() => {
-        button.disabled = false;
-      });
-    }
-
-    function renderPending(pending) {
-      document.getElementById('pending-count').textContent = pending.length;
-      const list = document.getElementById('pending-list');
-      list.innerHTML = '';
-
-      if (pending.length === 0) {
-        const empty = document.createElement('li');
-        empty.className = 'empty-pending';
-        empty.textContent = 'Nothing waiting right now.';
-        list.appendChild(empty);
-        return;
-      }
-
-      pending.forEach((entry) => {
-        const li = document.createElement('li');
-
-        const gameLabel = document.createElement('span');
-        gameLabel.className = 'pending-game';
-        gameLabel.textContent = GAMES[entry.game] || entry.game;
-        li.appendChild(gameLabel);
-
-        const score = document.createElement('span');
-        score.className = 'pending-score';
-        score.textContent = formatScore(entry.game, entry.score);
-        li.appendChild(score);
-
-        const del = document.createElement('button');
-        del.type = 'button';
-        del.className = 'delete-entry';
-        del.textContent = '✕';
-        del.title = 'Remove this pending score';
-        del.onclick = () => requestDeletePending(entry, del);
-        li.appendChild(del);
-
-        list.appendChild(li);
       });
     }
 
@@ -436,7 +352,7 @@
         if (rows.length === 0) {
           const empty = document.createElement('div');
           empty.className = 'empty-board';
-          empty.textContent = 'No scores yet';
+          empty.textContent = 'Ingen highscores enda';
           board.appendChild(empty);
         } else {
           const ol = document.createElement('ol');
@@ -451,8 +367,12 @@
 
             const rank = document.createElement('span');
             rank.className = 'rank';
-            rank.textContent = String(i + 1);
+            rank.textContent = i === 0 ? '' : String(i);
             li.appendChild(rank);
+
+            if (i === 0) {
+              li.classList.add('latest-entry');
+            }
 
             if (row.photo_filename) {
               const img = document.createElement('img');
@@ -469,7 +389,7 @@
 
             const score = document.createElement('span');
             score.className = 'score';
-            score.textContent = formatScore(game, row.score);
+            score.textContent = `${row.player_alias || 'ukjent-spiller'}: ${formatScore(game, row.score)}`;
             li.appendChild(score);
 
             const del = document.createElement('button');
@@ -512,7 +432,6 @@
         if (data.updated_at !== lastUpdatedAt) {
           lastUpdatedAt = data.updated_at;
           renderBoards(data.leaderboards || {});
-          renderPending(data.pending || []);
         }
 
         lastFetchFailed = false;
@@ -541,7 +460,7 @@
         body: JSON.stringify({ action: 'reset', password }),
       }).then(loadState).finally(() => {
         resetBtn.disabled = false;
-        resetBtn.textContent = 'Reset project data';
+        resetBtn.textContent = 'Tøm ledertavlen';
       });
     };
 

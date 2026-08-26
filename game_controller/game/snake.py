@@ -191,10 +191,11 @@ class MAIN:
         return len(self.snake.body) - 3
 
     def game_over(self):
-        if not self.alive:          
+        if not self.alive:
             return
         score = len(self.snake.body) - 3
-        self.controller.send_score("snake", score)
+        if self.controller.score_game is not None:
+            self.controller.send_score(self.controller.score_game, score)
         self.alive = False
 
     def draw_grass(self):

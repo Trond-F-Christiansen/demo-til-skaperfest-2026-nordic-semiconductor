@@ -269,6 +269,9 @@ class SerialController:
         except (serial.SerialException, OSError) as exc:
             print(f"[controller] failed to send score: {exc}")
 
+    def set_score_game(self, game: str | None) -> None:
+        self.score_game = game
+
     def _run(self) -> None:
         assert self._serial is not None
         while not self._stop.is_set():

@@ -80,13 +80,14 @@ class Game:
     """
 
     def __init__(self, name, run, result_label="Score", result_unit="",
-                 instructions=None, token=None):
+                 instructions=None, token=None, score_game=None):
         self.name = name
         self.run = run
         self.result_label = result_label
         self.result_unit = result_unit
         self.instructions = instructions
         self.token = token
+        self.score_game = score_game
 
     def result_text(self, result):
         return f"{self.result_label}: {result}{self.result_unit}"
@@ -100,7 +101,7 @@ class Game:
 # gestures and hand shapes a player actually needs. Only the quiz has a gesture
 # assigned for leaving its page -- see instructions.py.
 GAMES = [
-    Game("Snake (stemme)", snake.run, token="SNAKE_VOICE",
+    Game("Snake (stemme)", snake.run, token="SNAKE_VOICE", score_game="snake_voice",
          instructions=instructions.Instructions(
              lines=(
                  "Styr slangen med stemmen: si opp, ned, venstre eller høyre.",
@@ -110,7 +111,7 @@ GAMES = [
              images=("head_up", "head_left", "head_right", "head_down"),
              advance_hint="Trykk BTN0 for å starte",
          )),
-    Game("Snake (bevegelse)", snake.run, token="SNAKE_GESTURE",
+    Game("Snake (bevegelse)", snake.run, token="SNAKE_GESTURE", score_game="snake_geusture",
          instructions=instructions.Instructions(
              lines=(
                  "Styr slangen med håndbevegelser: sveip opp, ned, venstre "
@@ -136,8 +137,8 @@ GAMES = [
              advance=instructions.digit(2),
              advance_hint="Vis to fingre for å starte",
          )),
-    Game("Minesweeper", minesweeper_game.run, token="MINESWEEPER",
-         result_label="Tid", result_unit="s",
+        Game("Minesweeper", minesweeper_game.run, token="MINESWEEPER",
+            result_label="Tid", result_unit="s", score_game="minesweeper",
          instructions=instructions.Instructions(
              lines=(
                  "Si \"mark\" for å åpne ruter, eller \"bomb\" for å markere "
@@ -471,7 +472,7 @@ def main_menu(screen, clock, controller, token_map):
             if line2:
                 l2 = sub_font.render(line2, True, ui.TEXT_COLOR)
                 screen.blit(l2, l2.get_rect(center=(rect.centerx, rect.bottom + 24)))
-        
+
         pygame.display.update()
         clock.tick(60)
 
@@ -512,6 +513,7 @@ def run_app(screen, clock, controller):
         if not countdown(screen, clock, controller, game):
             return
 
+        controller.set_score_game(game.score_game)
         result = game.run(screen, clock, controller)
         if result is None:      # window closed mid-game -> quit app
             return
