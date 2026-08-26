@@ -17,11 +17,9 @@
  * ble_central.c:
  *
  *   led0  peer 0  "Game Controller"
- *   led1  peer 1  "Axon_Sensor"
  *
- * So at boot both blink, one goes solid as its board is found, and once both are
- * solid the receiver has stopped scanning. A board dropping out puts its LED
- * back to blinking without touching the other.
+ * So at boot it blinks, then goes solid once the board is found and the receiver
+ * has stopped scanning. The board dropping out puts the LED back to blinking.
  */
 #ifndef __LED_STATUS_H__
 #define __LED_STATUS_H__
@@ -34,7 +32,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 /** Number of peers with a status LED. Must match the peer table's size. */
-#define LED_STATUS_COUNT 2
+#define LED_STATUS_COUNT 1
 
 /**
  * @brief Configure the status LEDs and start the "searching" blink.

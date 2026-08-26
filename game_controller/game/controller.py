@@ -6,7 +6,7 @@ on the DK acts as the BLE central and relays each one onto its console UART as a
 plain-text line. Two token families are understood:
 
     Command: UP  / DOWN / LEFT / RIGHT          -> directions (snake)
-    Command: ZERO / ONE / ... / FIVE            -> finger digits 0-5 (quiz)
+    Command: ZERO / ONE / ... / FIVE            -> finger digits 0-5
 
 The finger_digits firmware only emits a digit once it has seen the same
 prediction five times in a row, so each token here is already a settled choice,
@@ -50,9 +50,9 @@ NUMBERS = {
 }
 
 # Finger-digit tokens from the finger_digits classifier -> the digit shown.
-# Games map these onto the matching number key (see quiz.py), so a digit is
-# equivalent to the player pressing 0-5 on the keyboard. A subset of NUMBERS:
-# one hand only shows up to five.
+# Games map these onto the matching number key, so a digit is equivalent to the
+# player pressing 0-5 on the keyboard. A subset of NUMBERS: one hand only shows
+# up to five.
 MAX_DIGIT = 5
 DIGITS = {word: n for word, n in NUMBERS.items() if n <= MAX_DIGIT}
 
@@ -291,15 +291,15 @@ class SerialController:
                 continue
             word = match.group(1)
 
-            # 1) Retning (Snake/Quiz)
+            # 1) Retning (Snake)
             direction = DIRECTIONS.get(word)
             if direction is not None:
                 self.directions.put(direction)
                 continue
 
             # 2) Tall. Minesweeper reads them as ("number", n) off self.commands;
-            #    the quiz reads 0-5 off self.digits. Post to both queues and let
-            #    each game take from the one it uses -- drain() clears the rest.
+            #    finger digits 0-5 go onto self.digits. Post to both queues and
+            #    let each game take from the one it uses -- drain() clears the rest.
             if word in NUMBERS:
                 self.commands.put(("number", NUMBERS[word]))
                 if word in DIGITS:
@@ -329,7 +329,7 @@ class SerialController:
                 q.get()
 
     def get_menu(self):
-        # Returnerer neste menyvalg ("SNAKE"/"QUIZ"/"MINESWEEPER") eller None.
+        # Returnerer neste menyvalg ("SNAKE"/"MINESWEEPER") eller None.
         try:
             return self.menu.get_nowait()
         except queue.Empty:

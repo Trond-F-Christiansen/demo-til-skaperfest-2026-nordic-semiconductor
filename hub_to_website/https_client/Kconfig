@@ -1,0 +1,36 @@
+#
+# Copyright (c) 2021 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "HTTPS client sample"
+
+config SAMPLE_TFM_MBEDTLS
+	bool "Use TF-M and MbedTLS"
+	depends on NRF_MODEM_LIB
+	help
+	  Use TF-M and MbedTLS in this sample instead of using
+	  the offloaded TLS stack in the modem.
+
+config HTTPS_HOSTNAME
+	string "HTTPS hostname"
+	default "lrcs-student-project-website.fly.dev"
+
+config HTTPS_GAME
+	string "Leaderboard game id"
+	default "snake_voice"
+	help
+	  Game path segment used in POST /api/scores/<game>.
+
+config HTTPS_DEVICE_TOKEN
+	string "Device bearer token"
+	default ""
+	help
+	  Must match the server's DEVICE_API_TOKEN. Sent as "Authorization: Bearer".
+
+endmenu
+
+menu "Zephyr Kernel"
+source "Kconfig.zephyr"
+endmenu

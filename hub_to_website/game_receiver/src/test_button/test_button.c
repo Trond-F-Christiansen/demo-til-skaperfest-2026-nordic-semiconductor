@@ -18,7 +18,7 @@
 LOG_MODULE_REGISTER(test_button, LOG_LEVEL_INF);
 
 #define BUTTON_DEBOUNCE_MS 200
-#define TEST_GAME          "snake"
+#define TEST_GAME          "snake_voice"
 #define TEST_SCORE         20
 
 static const struct gpio_dt_spec btn = GPIO_DT_SPEC_GET(DT_ALIAS(sw0), gpios);

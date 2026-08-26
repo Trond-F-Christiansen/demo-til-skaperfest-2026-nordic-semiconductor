@@ -10,7 +10,7 @@
  * @ingroup game_receiver
  *
  * @brief TEMPORARY bring-up helper: sends a fake highscore through the real
- *        uart30 -> nRF9151 path when button sw0 is pressed.
+ *        uart21 -> nRF9151 path when button sw0 is pressed.
  *
  * This lets the full hub -> nRF9151 -> MQTT -> website chain be tested before
  * the game console can send real "SCORE:..." notifications over BLE. Remove

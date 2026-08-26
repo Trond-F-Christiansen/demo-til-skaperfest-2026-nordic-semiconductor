@@ -5,9 +5,10 @@
  *
  * @brief Game receiver entry point.
  *
- * Bridges the game_controller's BLE commands onto this board's console
- * UART: connects as a NUS central and relays every received token as a
- * "Command: <token>" console line.
+ * Bridges the game_controller's BLE commands onto this board's game-control
+ * link (VCOM1, uart30): connects as a NUS central and relays every received
+ * token as a "Command: <token>" line, keeping the console (VCOM0) for debug
+ * logging.
  */
 
 #include <zephyr/kernel.h>
@@ -24,7 +25,7 @@ int main(void)
 {
 	int err;
 
-	/* Before the BLE central, so both LEDs are already blinking by the time
+	/* Before the BLE central, so the LED is already blinking by the time
 	 * scanning starts and the board never looks dead at boot.
 	 *
 	 * A failure here is not fatal: relaying commands is this board's job, and

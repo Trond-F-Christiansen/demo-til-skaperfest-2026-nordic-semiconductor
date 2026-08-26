@@ -9,19 +9,15 @@
  * @{
  * @ingroup game_receiver
  *
- * @brief Connects to the game_controller and finger_digits peripherals and
- *        relays their Nordic UART Service (NUS) notifications onto the console
- *        UART.
+ * @brief Connects to the game_controller peripheral and relays its Nordic UART
+ *        Service (NUS) notifications onto the game-control link (VCOM1, uart30).
  *
- * Scans for peripherals by advertised name -- "Game Controller" and
- * "Axon_Sensor" -- connects to each, discovers its NUS instance and subscribes
- * to notifications. Both links are held at the same time, so voice/gesture
- * commands and finger-digit commands arrive on one console.
+ * Scans for the peripheral by advertised name -- "Game Controller" -- connects,
+ * discovers its NUS instance and subscribes to notifications.
  *
  * Each received token (e.g. "UP\r\n") is forwarded as a "Command: <token>" line
- * on the console, where a PC-side script can pick it up the same way it already
- * reads the console UART today. The format is identical whichever board sent it;
- * the source is only logged.
+ * on VCOM1, where a PC-side script picks it up. Debug logging stays on the
+ * console (VCOM0).
  */
 #ifndef __BLE_CENTRAL_H__
 #define __BLE_CENTRAL_H__

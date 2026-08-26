@@ -40,7 +40,6 @@ import argparse
 import pygame
 
 import instructions
-import quiz
 import snake
 import ui
 from minesweeper import minesweeper_game
@@ -59,8 +58,7 @@ COUNTDOWN_SECONDS = 3
 # Menu tokens name what the player asked for, not which button was pressed --
 # game_controller's btn0 and btn1 both send SNAKE, differing only in the engine
 # they switch to (voice vs swipe gestures), which is entirely that board's
-# business since both feed us the same UP/DOWN/LEFT/RIGHT commands. QUIZ comes
-# from the finger_digits board instead.
+# business since both feed us the same UP/DOWN/LEFT/RIGHT commands.
 #
 # The main menu maps each token to a game via GAME_TOKENS in run_app().
 
@@ -72,8 +70,8 @@ class Game:
     @param run           entry point, run(screen, clock, controller) -> result.
     @param result_label  how the game-over screen words that result, and the
                          unit to print after it. Minesweeper is timed, so its
-                         result is seconds and lower is better; snake and quiz
-                         return a higher-is-better score.
+                         result is seconds and lower is better; snake
+                         returns a higher-is-better score.
     @param instructions  an instructions.Instructions for the how-to-play page
                          shown on the way in, or None to go straight to the
                          countdown.
@@ -98,8 +96,7 @@ class Game:
 #
 # The instructions text is placeholder wording for now; the images are real,
 # taken from the Graphics/ art each game already uses, so the pages show the
-# gestures and hand shapes a player actually needs. Only the quiz has a gesture
-# assigned for leaving its page -- see instructions.py.
+# gestures and hand shapes a player actually needs.
 GAMES = [
     Game("Snake (stemme)", snake.run, token="SNAKE_VOICE", score_game="snake_voice",
          instructions=instructions.Instructions(
@@ -121,21 +118,6 @@ GAMES = [
              ),
              images=("head_up", "head_left", "head_right", "head_down"),
              advance_hint="Trykk BTN1 for å starte",
-         )),
-    Game("Quiz", quiz.run, token="QUIZ", instructions=instructions.Instructions(
-             lines=(
-                 "Quizen har 10 spørsmål. Hvert spørsmål har opptil fem svar.",
-                 "Hold opp så mange fingre som svaret du vil velge -- se nøye "
-                 "på bildene under for hvordan hvert tall vises.",
-                 "Håndbevegelsene er ikke alltid opplagte, så studer dem godt "
-                 "før du starter.",
-                 "Riktig svar lyser grønt et lite øyeblikk. Ta hånden ut av "
-                 "boksen når neste spørsmål kommer.",
-                 "Du får poeng for hvert riktige svar. Lykke til!",
-             ),
-             images=("one", "shaka", "rocknroll", "four", "five"),
-             advance=instructions.digit(2),
-             advance_hint="Vis to fingre for å starte",
          )),
         Game("Minesweeper", minesweeper_game.run, token="MINESWEEPER",
             result_label="Tid", result_unit="s", score_game="minesweeper",
@@ -339,8 +321,8 @@ def show_result(screen, clock, controller, game, result):
 
 MENU_GRID = [
     ("BTN0", "Snake", "(bevegelse)", "SNAKE_GESTURE"),
-    ("BTN1", "Quiz", "(kamera)", "QUIZ"),
-    ("BTN2", "Snake", "(stemme)", "SNAKE_VOICE"),
+    ("BTN1", "Snake", "(stemme)", "SNAKE_VOICE"),
+    ("BTN2", "", "", None),
     ("BTN3", "Minesweeper", "(stemme)", "MINESWEEPER"),
 ]
 

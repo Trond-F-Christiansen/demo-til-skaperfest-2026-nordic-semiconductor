@@ -3,11 +3,41 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-/* Dedicated UART link to the hub's nRF9151, which publishes the highscore
- * over MQTT. Kept separate from the console UART so controller-command
- * forwarding on the console is unaffected. Default uart30 pins on this DK are
- * TX P0.6 / RX P0.7; cross TX<->RX to the nRF9151 and share a ground wire.
+/*
+ * UART roles on this board:
+ *   uart20 -> VCOM0: console / debug logging (board default pins, untouched).
+ *   uart30 -> VCOM1: game-control link to the PC. Scores come in on it and the
+ *             relayed controller commands go out on it (P0.6 TX / P0.7 RX).
+ *   uart21 -> dedicated 2-wire link to the hub's nRF9151, on expansion-header
+ *             pins TX P1.04 / RX P1.05. Cross TX<->RX to the nRF9151 uart1
+ *             (its RX is P0.28) and share a ground wire.
  */
+
+&pinctrl {
+	uart21_default: uart21_default {
+		group1 {
+			psels = <NRF_PSEL(UART_TX, 1, 4)>,
+				<NRF_PSEL(UART_RX, 1, 5)>;
+		};
+	};
+
+	uart21_sleep: uart21_sleep {
+		group1 {
+			psels = <NRF_PSEL(UART_TX, 1, 4)>,
+				<NRF_PSEL(UART_RX, 1, 5)>;
+			low-power-enable;
+		};
+	};
+};
+
+&uart21 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart21_default>;
+	pinctrl-1 = <&uart21_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
 &uart30 {
 	status = "okay";
 	current-speed = <115200>;

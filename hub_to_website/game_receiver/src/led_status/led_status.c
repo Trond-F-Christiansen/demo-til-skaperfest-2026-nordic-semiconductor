@@ -24,7 +24,6 @@ LOG_MODULE_REGISTER(led_status, LOG_LEVEL_INF);
 
 static const struct gpio_dt_spec leds[LED_STATUS_COUNT] = {
 	GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios),
-	GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios),
 };
 
 /* Per-peer link state, and the phase every blinking LED shares so they pulse
@@ -117,7 +116,7 @@ int led_status_init(void)
 	leds_apply();
 	blink_update();
 
-	LOG_INF("Status LEDs ready: led0 = peer 0, led1 = peer 1");
+	LOG_INF("Status LED ready: led0 = peer 0");
 	return 0;
 }
 

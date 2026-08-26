@@ -18,18 +18,12 @@ import pygame
 FONT_DISPLAY = 'Font/PoetsenOne-Regular.ttf'   # headings, scores
 FONT_TEXT = 'Font/Helvetica.ttf'               # everything else
 
-# Menu and quiz palette. Minesweeper keeps its own board colours in
+# Menu palette. Minesweeper keeps its own board colours in
 # minesweeper/config.py -- those are gameplay signals (mine red, flag red,
 # per-number colours), not chrome.
 BG_COLOR = "#34C3D5"
 TEXT_COLOR = (255, 255, 255)
 HILITE_BG = "#003C66"
-
-# Answer feedback, used while the quiz holds an answered question on screen
-# (quiz.py REVEAL_SECONDS): the correct option turns green, and a wrong pick
-# turns red beside it. Both are dark enough for white text to stay readable.
-CORRECT_BG = "#1E7B3C"
-WRONG_BG = "#A32020"
 
 _fonts = {}
 

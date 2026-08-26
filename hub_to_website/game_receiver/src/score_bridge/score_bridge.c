@@ -16,21 +16,20 @@
 
 LOG_MODULE_REGISTER(score_bridge, LOG_LEVEL_INF);
 
-/* Dedicated link to the nRF9151, enabled by the board overlay. */
-static const struct device *uart_dev = DEVICE_DT_GET(DT_NODELABEL(uart30));
-/*uart20 for scores from pygame*/
-static const struct device *uart_game = DEVICE_DT_GET(DT_NODELABEL(uart20));
+/* Dedicated 2-wire link to the nRF9151 on expansion-header pins
+ * (uart21: TX P1.04 / RX P1.05). Enabled by the board overlay.
+ */
+static const struct device *uart_dev = DEVICE_DT_GET(DT_NODELABEL(uart21));
+/* Game-control link to the PC on VCOM1 (uart30): scores in, commands out. */
+static const struct device *uart_game = DEVICE_DT_GET(DT_NODELABEL(uart30));
 
-/*variables for uart20*/
+/*variables for uart_game*/
 #define LINE_MAX 256
 static uint8_t line_buf[LINE_MAX];   /* ISR bygger linja her */
 static size_t line_len;
 static uint8_t ready_line[LINE_MAX]; /* ferdig linje til tasken */
 static size_t ready_len;
 static K_SEM_DEFINE(line_ready_sem, 0, 1);
-
-/* Per-round counter used to build a session_id unique within one power cycle. */
-static uint32_t seq;
 
 static void uart_game_cb(const struct device *dev, void *user_data);
 
@@ -47,17 +46,22 @@ void score_bridge_send(const char *game, uint32_t points)
 	int len;
 
 	len = snprintf(line, sizeof(line),
-		       "%s|{\"session_id\":\"%s-%u\",\"score\":%u}\n",
-		       game, game, seq, points);
+		       "%s|{\"score\":%u}\n", game, points);
 	if ((len < 0) || (len >= (int)sizeof(line))) {
 		LOG_ERR("Score line too long, dropping (game=%s, score=%u)", game, points);
 		return;
 	}
 
 	uart_send_str(line, len);
-	seq++;
 
-	LOG_INF("Forwarded to nRF9151: %.*s", len - 1, line); 
+	LOG_INF("Forwarded to nRF9151: %.*s", len - 1, line);
+}
+
+void score_bridge_write_game(const char *buf, size_t len)
+{
+	for (size_t i = 0; i < len; i++) {
+		uart_poll_out(uart_game, (uint8_t)buf[i]);
+	}
 }
 
 
@@ -66,7 +70,7 @@ int score_bridge_init(void)
 	int err;
 
 	if (!device_is_ready(uart_dev)) {
-		LOG_ERR("uart30 device not ready");
+		LOG_ERR("nRF9151 link (uart21) not ready");
 		return -ENODEV;
 	}
 /* new for uart_game*/
@@ -83,7 +87,7 @@ int score_bridge_init(void)
 
 	uart_irq_rx_enable(uart_game);
 
-	LOG_INF("Score bridge ready, forwarding highscores on uart30");
+	LOG_INF("Score bridge ready, forwarding highscores on uart21");
 	return 0;
 }
 
@@ -125,11 +129,8 @@ static void uart_game_cb(const struct device *dev, void *user_data)
 
 /* Accepts both what the pygame side writes today and the plain SCORE: form:
  *
- *     snake|{"score": 1}   ->  game "snake", points 1
- *     SCORE:snake:1        ->  game "snake", points 1
- *
- * Any session_id the PC supplied is discarded on purpose - score_bridge_send()
- * is the only thing that builds that field.
+ *     snake_voice|{"score": 1}   ->  game "snake_voice", points 1
+ *     SCORE:snake_voice:1        ->  game "snake_voice", points 1
  */
 static int parse_game_line(char *line, const char **game, uint32_t *points)
 {

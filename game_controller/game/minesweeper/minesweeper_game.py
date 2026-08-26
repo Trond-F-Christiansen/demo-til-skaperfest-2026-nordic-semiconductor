@@ -1,7 +1,7 @@
 """Minesweeper's game loop, played by voice through the shared controller.
 
-@ref run is the menu's entry point, under the same contract as snake.run and
-quiz.run: it owns its loop and returns the run's result, or None if the player
+@ref run is the menu's entry point, under the same contract as snake.run:
+it owns its loop and returns the run's result, or None if the player
 closed the window (main.py treats None as "quit the app"). The result here is
 elapsed seconds -- lower is better -- which is why main.py labels minesweeper's
 result "Time" rather than "Score".
@@ -241,8 +241,8 @@ def run(screen, clock, controller):
 
         if game.game_won or game.game_lost:
             seconds = game.get_elapsed_time()
-            if game.game_won:
-                controller.send_score("minesweeper", seconds)
+            if game.game_won and controller.score_game is not None:
+                controller.send_score(controller.score_game, seconds)
             pygame.display.flip()
             pygame.time.delay(1500)   # la spilleren se resultatet
             return seconds

@@ -1,0 +1,15 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
+
+#include <samples/cellular/nrf91_crypto_partitions.dtsi>
+
+#include <samples/cellular/nrf91_sram_crypto_partitions.dtsi>
+
+/* uart1 is the link to the hub firmware that streams "<game>|<json>" lines. */
+&uart1 {
+	status = "okay";
+	current-speed = <115200>;
+};

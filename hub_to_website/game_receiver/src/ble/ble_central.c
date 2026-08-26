@@ -41,19 +41,13 @@ LOG_MODULE_REGISTER(ble_central, LOG_LEVEL_INF);
 /*
  * One slot per peripheral this receiver expects, matched by advertised name.
  *
- * Both boards run the same NUS peripheral role, so they are told apart by name:
- * "Game Controller" is applications/game_controller (voice and gesture commands)
- * and "Axon_Sensor" is nicco_apps/image_classification/finger_digits_py_gs (the
- * finger-digit classifier that drives the quiz). Names, not addresses: the
- * previous single hardcoded address meant swapping a board silently stopped the
- * receiver from ever connecting.
+ * The only peripheral is "Game Controller" (applications/game_controller),
+ * which sends voice and gesture commands over NUS. Matching by name rather than
+ * a hardcoded address means swapping the board does not silently stop the
+ * receiver from connecting.
  *
- * Note that finger_digits_py_rgb advertises under the same "Axon_Sensor" name,
- * so if both classifier variants are powered on, whichever answers the scan
- * first takes the slot.
- *
- * Each slot owns its own bt_nus_client: that structure holds the GATT handles
- * discovered on one link, so it cannot be shared between connections.
+ * The slot owns its own bt_nus_client: that structure holds the GATT handles
+ * discovered on the link, so it cannot be shared between connections.
  */
 struct peer {
 	/** Advertised complete local name to scan for. */
@@ -66,7 +60,6 @@ struct peer {
 
 static struct peer peers[] = {
 	{ .name = "Game Controller" },
-	{ .name = "Axon_Sensor" },
 };
 
 BUILD_ASSERT(ARRAY_SIZE(peers) <= CONFIG_BT_MAX_CONN,
@@ -74,9 +67,9 @@ BUILD_ASSERT(ARRAY_SIZE(peers) <= CONFIG_BT_MAX_CONN,
 BUILD_ASSERT(ARRAY_SIZE(peers) <= CONFIG_BT_SCAN_NAME_CNT,
 	     "CONFIG_BT_SCAN_NAME_CNT is too low to filter on every peer name");
 
-/* The status LEDs are mapped positionally onto this table -- led0 to peers[0],
- * led1 to peers[1] -- so adding a peer without adding an LED must not silently
- * leave the new one unindicated.
+/* The status LED is mapped positionally onto this table -- led0 to peers[0] --
+ * so adding a peer without adding an LED must not silently leave the new one
+ * unindicated.
  */
 BUILD_ASSERT(ARRAY_SIZE(peers) == LED_STATUS_COUNT,
 	     "Every peer needs a status LED (see led_status.h)");
@@ -184,18 +177,27 @@ static uint8_t nus_data_received(struct bt_nus_client *nus, const uint8_t *data,
 	 */
 	if ((len >= strlen(MENU_PREFIX)) &&
 	    (memcmp(data, MENU_PREFIX, strlen(MENU_PREFIX)) == 0)) {
-		printk("%.*s\r\n", len, data);
+		char out[64];
+		int n = snprintk(out, sizeof(out), "%.*s\r\n", (int)len, data);
+
+		if (n > 0) {
+			score_bridge_write_game(out, MIN((size_t)n, sizeof(out) - 1));
+		}
 		return BT_GATT_ITER_CONTINUE;
 	}
 
-	/* The console format is deliberately unchanged now that two peripherals
-	 * feed it, so the host-side parser needs no update. Which board a token
-	 * came from is logged instead -- worth knowing because the tokens are not
-	 * unique: the Minesweeper keyword model and the finger-digit classifier
-	 * both emit "ZERO".
+	/* Each token is forwarded as a "Command: <token>" line, with the source
+	 * board logged for diagnostics.
 	 */
 	LOG_DBG("Command from %s: %.*s", source, len, data);
-	printk("Command: %.*s\r\n", len, data);
+	{
+		char out[64];
+		int n = snprintk(out, sizeof(out), "Command: %.*s\r\n", (int)len, data);
+
+		if (n > 0) {
+			score_bridge_write_game(out, MIN((size_t)n, sizeof(out) - 1));
+		}
+	}
 
 	return BT_GATT_ITER_CONTINUE;
 }
@@ -349,21 +351,15 @@ static void scan_filter_match(struct bt_scan_device_info *device_info,
 	 * Compare over the advertised name's length and require the lengths to be
 	 * equal, rather than strcmp()ing the reported filter name.
 	 *
-	 * The scan module stores filter names with memcpy() and no NUL terminator
-	 * (scan_name_filter_add() in nrf/subsys/bluetooth/scan.c), and
-	 * bt_scan_filter_remove_all() only zeroes the filter count, not the name
-	 * buffers. Since scan_start() rebuilds the filter set on every connect and
-	 * disconnect, a shorter name lands in a slot that held a longer one and
-	 * keeps its tail: "Axon_Sensor" written over "Game Controller" reads back
-	 * as "Axon_Sensorller". The module's own matching is unaffected because it
-	 * bounds the comparison by the advertised length, but a strcmp() here would
-	 * silently fail to identify the peer, and connected() would then drop a
-	 * board it should have kept.
+	 * The scan module's filter is effectively "starts with": a device
+	 * advertising "Game" would match a "Game Controller" filter. Requiring the
+	 * lengths to be equal rejects such a prefix match here, so connected() only
+	 * ever accepts the exact peer name.
 	 *
-	 * The length equality also stops one peer name from matching another's
-	 * prefix -- worth keeping, because the module's filter is effectively
-	 * "starts with": a device advertising "Game" matches a "Game Controller"
-	 * filter. Such a device is rejected here and dropped by connected().
+	 * It also sidesteps a quirk of the scan module: it stores filter names with
+	 * memcpy() and no NUL terminator (scan_name_filter_add() in
+	 * nrf/subsys/bluetooth/scan.c), so bounding the compare by the advertised
+	 * length is the only reliable way to match.
 	 */
 	const size_t match_len = filter_match->name.len;
 

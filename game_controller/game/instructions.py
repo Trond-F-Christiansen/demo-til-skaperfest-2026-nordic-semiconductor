@@ -14,10 +14,10 @@ how the player continues:
     Instructions(lines, images, advance, advance_hint)
 
 `advance` is a predicate (controller) -> bool polled once per frame, for
-continuing with the same hardware the game itself is played with. The quiz
-passes digit(2) -- the shaka -- because a quiz player is holding the
-finger_digits board. Snake and minesweeper have no gesture or keyword assigned
-for this yet and pass None, so they continue from the keyboard only.
+continuing with the same hardware the game itself is played with. Snake and
+minesweeper have no gesture or keyword assigned for this yet and pass None, so
+they continue from the keyboard only. digit(n) builds such a predicate for a
+finger-digit board, if a game wants one.
 
 ENTER / SPACE always continues and ESC always quits, on every page, so the
 instructions stay usable with no board connected (see main.py, which carries on

@@ -1,7 +1,7 @@
 """Minesweeper's own constants: board geometry and gameplay colours.
 No serial settings live here. Port selection and baud rate belong to
 controller.py alone, which autodetects the DK -- minesweeper gets its input
-from the shared SerialController like snake and quiz do.
+from the shared SerialController like snake does.
 """
 
 # Colors
