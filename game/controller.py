@@ -69,6 +69,10 @@ COMMANDS = {
 }
 _COMMAND_RE = re.compile(r"Command:\s*(\w+)")
 _MENU_RE = re.compile(r"MENU:(\w+)")
+
+# Returned by a game's run() when the controller sent BACK, so main.py returns
+# to the main menu without showing a result (distinct from None = quit app).
+BACK_TO_MENU = object()
 # Lines that only game_receiver's firmware ever prints, used to tell its
 # console apart from another DK's console when both are plugged in at once
 # (see _probe_is_receiver()). Deliberately narrow: e.g. "Bluetooth
@@ -334,6 +338,20 @@ class SerialController:
             return self.menu.get_nowait()
         except queue.Empty:
             return None
+
+    def check_back(self) -> bool:
+        """True if a BACK token has arrived (btn0 / long press). Consumes any
+        queued menu tokens, which are stale while a game is running.
+        """
+        found = False
+        while True:
+            try:
+                tok = self.menu.get_nowait()
+            except queue.Empty:
+                break
+            if tok == "BACK":
+                found = True
+        return found
 
     def get_command(self, max_square: int | None = None):
     #returnerer samme format som minesweeper forventer

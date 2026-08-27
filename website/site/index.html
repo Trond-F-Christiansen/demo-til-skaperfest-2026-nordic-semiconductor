@@ -39,6 +39,27 @@
       text-align: center;
     }
 
+    .site-banner {
+      max-width: 1100px;
+      margin: 0 auto 1.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.1rem;
+    }
+
+    .site-banner__logo {
+      height: 2.6rem;
+      width: auto;
+      display: block;
+    }
+
+    .site-banner__title {
+      font-size: 2.1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
     h1 {
       font-size: 1.8rem;
       font-weight: 700;
@@ -58,8 +79,8 @@
     .reset-btn {
       margin-top: 0.9rem;
       background: transparent;
-      border: 1px solid var(--red);
-      color: var(--red);
+      border: 1px solid #482726;
+      color: #482726;
       border-radius: 6px;
       padding: 0.35rem 0.8rem;
       font-family: inherit;
@@ -227,6 +248,10 @@
   </style>
 </head>
 <body>
+  <div class="site-banner">
+    <img src="nordic-logo.png" alt="N" class="site-banner__logo">
+    <span class="site-banner__title">ordic Edge AI Spill</span>
+  </div>
   <header>
     <h1>🏆 Highscores 🏆</h1>
     <div id="status">Loading&hellip;</div>
@@ -305,12 +330,14 @@
     };
     let firstRender = true;
 
-    function formatScore(game, score) {
+    function formatScore(game, row) {
       if (game === 'minesweeper') {
-        const s = Math.round(score);
-        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+        const cleared = Math.round(row.score);
+        const t = Math.round(row.time || 0);
+        const mmss = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+        return `${cleared} brikker · ${mmss}`;
       }
-      return String(score);
+      return String(row.score);
     }
 
     function requestDelete(game, entry, button) {
@@ -389,7 +416,7 @@
 
             const score = document.createElement('span');
             score.className = 'score';
-            score.textContent = `${row.player_alias || 'ukjent-spiller'}: ${formatScore(game, row.score)}`;
+            score.textContent = `${row.player_alias || 'ukjent-spiller'}: ${formatScore(game, row)}`;
             li.appendChild(score);
 
             const del = document.createElement('button');

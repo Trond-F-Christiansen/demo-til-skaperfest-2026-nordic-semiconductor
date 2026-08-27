@@ -20,7 +20,7 @@ WIDTH = 30
 HEIGHT = 30
 NSQUARES = 8
 NUM_BOMBS = 6
-MARGIN = 11
+MARGIN = 2
 MENU_SIZE = 70
 LABEL_SIZE = 30   # plass til tall langs kantene
 
@@ -46,4 +46,16 @@ NUMBER_COLORS = {
     7: (0, 0, 0),        # svart
     8: (128, 128, 128),  # grå
 }
+
+# Classic Minesweeper chrome: a grey board with 3D-bevelled cells.
+MS_BG = (160, 160, 160)        # board background behind the raised cells
+MS_FACE = (192, 192, 192)      # unopened cell / panel face
+MS_LIGHT = (255, 255, 255)     # bevel highlight (top-left)
+MS_SHADOW = (128, 128, 128)    # bevel shadow (bottom-right)
+MS_OPEN = (198, 198, 198)      # opened cell face (flat)
+MS_OPEN_EDGE = (128, 128, 128) # opened cell grid line
+MS_TEXT = (0, 0, 0)
+
+# Nordic Semiconductor brand blue, used for the board/window background.
+NORDIC_BLUE = (0, 169, 206)
 

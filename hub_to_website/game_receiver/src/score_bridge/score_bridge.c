@@ -127,40 +127,21 @@ static void uart_game_cb(const struct device *dev, void *user_data)
 /*new for uart_game: sender linje mottat videre */
 
 
-/* Accepts both what the pygame side writes today and the plain SCORE: form:
- *
- *     snake_voice|{"score": 1}   ->  game "snake_voice", points 1
- *     SCORE:snake_voice:1        ->  game "snake_voice", points 1
+/* Parse the legacy BLE form "SCORE:<game>:<points>" into game + points. The
+ * pygame "game|{json}" form is not parsed here -- it is forwarded verbatim so
+ * any extra fields (e.g. minesweeper's time) reach the nRF9151.
  */
-static int parse_game_line(char *line, const char **game, uint32_t *points)
+static int parse_score_line(char *line, const char **game, uint32_t *points)
 {
-	char *sep, *key;
+	char *p = line + 6;   /* past "SCORE:" */
+	char *sep = strchr(p, ':');
 
-	if (strncmp(line, "SCORE:", 6) == 0) {
-		char *p = line + 6;
-
-		sep = strchr(p, ':');
-		if ((sep == NULL) || (sep == p) || (sep[1] == '\0')) {
-			return -EINVAL;
-		}
-		*sep = '\0';
-		*game = p;
-		*points = (uint32_t)strtoul(sep + 1, NULL, 10);
-		return 0;
-	}
-
-	sep = strchr(line, '|');
-	if ((sep == NULL) || (sep == line)) {
+	if ((sep == NULL) || (sep == p) || (sep[1] == '\0')) {
 		return -EINVAL;
 	}
 	*sep = '\0';
-	*game = line;
-
-	key = strstr(sep + 1, "\"score\"");
-	if ((key == NULL) || ((key = strchr(key, ':')) == NULL)) {
-		return -EINVAL;
-	}
-	*points = (uint32_t)strtoul(key + 1, NULL, 10);   /* strtoul skips the space */
+	*game = p;
+	*points = (uint32_t)strtoul(sep + 1, NULL, 10);
 	return 0;
 }
 
@@ -168,8 +149,6 @@ static void score_bridge_task(void)
 {
 	while (true) {
 		char line[LINE_MAX + 1];
-		const char *game;
-		uint32_t points;
 
 		k_sem_take(&line_ready_sem, K_FOREVER);
 
@@ -180,12 +159,25 @@ static void score_bridge_task(void)
 		memcpy(line, ready_line, ready_len);
 		line[ready_len] = '\0';
 
-		if (parse_game_line(line, &game, &points) != 0) {
-			LOG_WRN("Unparsable line from game UART: \"%s\"", line);
-			continue;
-		}
+		if (strncmp(line, "SCORE:", 6) == 0) {
+			const char *game;
+			uint32_t points;
 
-		score_bridge_send(game, points);
+			if (parse_score_line(line, &game, &points) != 0) {
+				LOG_WRN("Unparsable SCORE line: \"%s\"", line);
+				continue;
+			}
+			score_bridge_send(game, points);
+		} else if (strchr(line, '|') != NULL) {
+			/* pygame "game|{json}" form: forward verbatim so extra
+			 * fields (e.g. minesweeper's time) reach the nRF9151.
+			 */
+			uart_send_str(line, ready_len);
+			uart_poll_out(uart_dev, (uint8_t)'\n');
+			LOG_INF("Forwarded to nRF9151: %s", line);
+		} else {
+			LOG_WRN("Unparsable line from game UART: \"%s\"", line);
+		}
 	}
 }
 

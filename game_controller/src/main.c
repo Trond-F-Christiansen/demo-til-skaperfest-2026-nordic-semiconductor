@@ -10,23 +10,17 @@
  * runs at a time.
  *
  * A short click picks a game *and* the engine that will drive it, and tells the
- * host which game to open (relayed to the host's menu as a MENU: token):
+ * host which game to open (relayed to the host's menu as a MENU: token). The DK
+ * is held sideways, so the buttons read BTN1/BTN3 over BTN0/BTN2:
  *
- *   btn0  Snake, driven by voice           KWS       -> MENU:SNAKE
- *   btn1  Snake, driven by swipe gestures  Gesture   -> MENU:SNAKE
- *   btn2  Minesweeper, driven by voice     KWS_MINE  -> MENU:MINESWEEPER
- *
- * Snake deliberately sits on two buttons: the host does not care which engine
- * feeds it, since both emit the same UP/DOWN/LEFT/RIGHT commands, so picking
- * the engine is entirely this side's business.
+ *   btn0  (no short action; hold any button to go back)  -> --
+ *   btn1  Snake, driven by swipe gestures  Gesture     -> MENU:SNAKE_GESTURE
+ *   btn2  Minesweeper, driven by voice     KWS_MINE    -> MENU:MINESWEEPER
+ *   btn3  Snake, driven by voice           KWS         -> MENU:SNAKE_VOICE
  *
  * A long click on any button sends MENU:BACK, which the host reads as "leave
  * this screen" (Main Menu on the game-over screen). The active engine is left
  * alone, since the next game choice sets it anyway.
- *
- * The quiz is played with the finger_digits controller, not this application,
- * so no button here selects it -- the host menu still accepts MENU:QUIZ from
- * that board.
  */
 
 #include <zephyr/logging/log.h>
@@ -68,7 +62,7 @@ static void on_button_click(uint8_t button_id, button_click_t click)
 
 	switch (button_id) {
 	case 0:
-		start_game(ENGINE_NAME_KWS, "MENU:SNAKE_VOICE\r\n");
+		/* No short action; hold any button to go back to the menu. */
 		break;
 	case 1:
 		start_game(ENGINE_NAME_GESTURE, "MENU:SNAKE_GESTURE\r\n");
@@ -77,8 +71,7 @@ static void on_button_click(uint8_t button_id, button_click_t click)
 		start_game(ENGINE_NAME_KWS_MINE, "MENU:MINESWEEPER\r\n");
 		break;
 	case 3:
-		/* Back to the host menu; engine unchanged. */
-		(void)ble_nus_send_raw("MENU:BACK\r\n");
+		start_game(ENGINE_NAME_KWS, "MENU:SNAKE_VOICE\r\n");
 		break;
 	default:
 		LOG_WRN("Ukjent knapp: %u", button_id);

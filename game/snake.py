@@ -22,12 +22,16 @@ import pygame
 from pygame.math import Vector2
 
 import ui
+from controller import BACK_TO_MENU
 
 # Grid geometry. Window is cell_number * cell_size on each side (1000 x 1000),
 # which main.py uses to size the shared window.
 cell_size = 57
 cell_number = 18
-screen_color = (175, 215, 70)
+screen_color = (108, 178, 66)
+
+# Cached grass texture surface, built once on first draw.
+_grass_surface = None
 
 # How often the snake advances, in milliseconds.
 TICK_MS = 400
@@ -40,6 +44,61 @@ SCREEN_UPDATE = pygame.USEREVENT
 screen = None
 apple = None
 game_font = None
+
+
+def _make_opaque(surface, bg=(255, 255, 255), threshold=8):
+    """Flatten `surface` so it is not see-through, keeping its shape and its
+    two-tone shading. The lighter tone is the base colour at reduced alpha, so
+    each pixel is composited over `bg` (which reproduces the light tone) and
+    then forced fully opaque. Fully transparent pixels stay transparent, so
+    only the logo shows -- no rectangle around it.
+    """
+    out = surface.copy()
+    out.lock()
+    w, h = out.get_size()
+    for x in range(w):
+        for y in range(h):
+            r, g, b, a = out.get_at((x, y))
+            if a <= threshold:
+                out.set_at((x, y), (0, 0, 0, 0))
+                continue
+            t = a / 255.0
+            out.set_at((x, y), (
+                int(r * t + bg[0] * (1 - t)),
+                int(g * t + bg[1] * (1 - t)),
+                int(b * t + bg[2] * (1 - t)),
+                255,
+            ))
+    out.unlock()
+    return out
+
+
+def _build_grass():
+    """Build the grassy field once: a two-tone checkerboard plus scattered
+    blade tufts. Seeded so the texture is stable frame to frame.
+    """
+    size = cell_number * cell_size
+    surf = pygame.Surface((size, size))
+
+    light = (112, 182, 66)
+    dark = (98, 168, 56)
+    for row in range(cell_number):
+        for col in range(cell_number):
+            base = light if (row + col) % 2 == 0 else dark
+            pygame.draw.rect(surf, base,
+                             (col * cell_size, row * cell_size,
+                              cell_size, cell_size))
+
+    blades = [(80, 146, 46), (70, 132, 40), (128, 198, 80)]
+    rng = random.Random(20260827)
+    for _ in range(size * size // 260):
+        x = rng.randint(0, size - 1)
+        y = rng.randint(2, size - 1)
+        h = rng.randint(4, 9)
+        lean = rng.randint(-2, 2)
+        pygame.draw.line(surf, rng.choice(blades), (x, y), (x + lean, y - h), 1)
+
+    return surf
 
 
 class FRUIT:
@@ -199,33 +258,27 @@ class MAIN:
         self.alive = False
 
     def draw_grass(self):
-        grass_color = (167, 209, 61)
-        for row in range(cell_number):
-            if row % 2 == 0:
-                for col in range(cell_number):
-                    if col % 2 == 0:
-                        grass_rect = pygame.Rect(col * cell_size, row * cell_size, cell_size, cell_size)
-                        pygame.draw.rect(screen, grass_color, grass_rect)
-            else:
-                for col in range(cell_number):
-                    if col % 2 != 0:
-                        grass_rect = pygame.Rect(col * cell_size, row * cell_size, cell_size, cell_size)
-                        pygame.draw.rect(screen, grass_color, grass_rect)
+        global _grass_surface
+        if _grass_surface is None:
+            _grass_surface = _build_grass()
+        screen.blit(_grass_surface, (0, 0))
 
     def draw_score(self):
         score_text = str(self.score())
-        score_surface = game_font.render(score_text, True, (56, 64, 12))
+        score_surface = ui.render_text(score_text, game_font, (255, 255, 255),
+                                       offset=2)
         score_x = int(cell_size * cell_number - 60)  # 60 is padding
         score_y = int(cell_size * cell_number - 40)
         score_rect = score_surface.get_rect(center=(score_x, score_y))
         nod_rect = apple.get_rect(midright=(score_rect.left - 20, score_rect.centery))
-        pad = 5
-        bg_rect = pygame.Rect(nod_rect.left - 5, nod_rect.top - pad, nod_rect.width + score_rect.width + 35, nod_rect.height + 2 * pad)
+        pad = 8
+        bg_rect = pygame.Rect(nod_rect.left - 12, nod_rect.top - pad,
+                              nod_rect.width + score_rect.width + 44,
+                              nod_rect.height + 2 * pad)
 
-        pygame.draw.rect(screen, (167, 209, 61), bg_rect)
+        ui.draw_panel(screen, bg_rect, radius=14)
         screen.blit(score_surface, score_rect)
         screen.blit(apple, nod_rect)
-        pygame.draw.rect(screen, (56, 64, 12), bg_rect, 2)
 
 
 def run(shared_screen, clock, controller):
@@ -243,6 +296,7 @@ def run(shared_screen, clock, controller):
 
     apple = pygame.image.load('Graphics/nod.png').convert_alpha()
     apple = pygame.transform.scale(apple, (cell_size, cell_size))
+    apple = _make_opaque(apple)
     game_font = ui.font(25, ui.FONT_DISPLAY)
 
     # Drop anything that piled up in the menu so the snake doesn't lurch off on
@@ -253,6 +307,9 @@ def run(shared_screen, clock, controller):
     pygame.time.set_timer(SCREEN_UPDATE, TICK_MS)
     try:
         while True:
+            if controller.check_back():
+                return BACK_TO_MENU
+
             # Controller input: drain the queue before each tick and pick the
             # newest legal turn (can't reverse straight back on yourself).
             while not controller.directions.empty():
@@ -271,19 +328,6 @@ def run(shared_screen, clock, controller):
                     return None
                 if event.type == SCREEN_UPDATE:
                     main_game.update()
-                if event.type == pygame.KEYDOWN:  # keyboard input
-                    if event.key == pygame.K_UP:
-                        if main_game.snake.direction.y != 1:
-                            main_game.snake.next_direction = Vector2(0, -1)
-                    if event.key == pygame.K_DOWN:
-                        if main_game.snake.direction.y != -1:
-                            main_game.snake.next_direction = Vector2(0, 1)
-                    if event.key == pygame.K_RIGHT:
-                        if main_game.snake.direction.x != -1:
-                            main_game.snake.next_direction = Vector2(1, 0)
-                    if event.key == pygame.K_LEFT:
-                        if main_game.snake.direction.x != 1:
-                            main_game.snake.next_direction = Vector2(-1, 0)
 
             if not main_game.alive:
                 return main_game.score()

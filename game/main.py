@@ -44,7 +44,7 @@ import snake
 import ui
 from minesweeper import minesweeper_game
 
-from controller import SerialController
+from controller import SerialController, BACK_TO_MENU
 
 # Window matches snake's grid. New games should draw within this.
 WINDOW_SIZE = (snake.cell_number * snake.cell_size,
@@ -106,7 +106,7 @@ GAMES = [
                  "hale, er runden over.",
              ),
              images=("head_up", "head_left", "head_right", "head_down"),
-             advance_hint="Trykk BTN0 for å starte",
+             advance_hint="Trykk BTN3 for å starte",
          )),
     Game("Snake (bevegelse)", snake.run, token="SNAKE_GESTURE", score_game="snake_geusture",
          instructions=instructions.Instructions(
@@ -180,25 +180,16 @@ def choose(screen, clock, controller, title, options, subtitle=None,
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return None
-            if event.type == pygame.KEYDOWN:
-                if event.key in (pygame.K_UP, pygame.K_w):
-                    selected = (selected - 1) % len(options)
-                elif event.key in (pygame.K_DOWN, pygame.K_s):
-                    selected = (selected + 1) % len(options)
-                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                    return values[selected]
-                elif event.key == pygame.K_ESCAPE:
-                    return None
 
         # ---- draw ---------------------------------------------------------
-        screen.fill(ui.BG_COLOR)
+        ui.draw_background(screen)
 
-        title_surf = title_font.render(title, True, ui.TEXT_COLOR)
-        screen.blit(title_surf, title_surf.get_rect(center=(cx, 200)))
+        title_surf = ui.render_text(title, title_font, offset=3)
+        ui.blit_center(screen, title_surf, (cx, 200))
 
         if subtitle:
-            sub_surf = sub_font.render(subtitle, True, ui.TEXT_COLOR)
-            screen.blit(sub_surf, sub_surf.get_rect(center=(cx, 290)))
+            sub_surf = ui.render_text(subtitle, sub_font, ui.TEXT_MUTED)
+            ui.blit_center(screen, sub_surf, (cx, 290))
 
         start_y = 430
         gap = 90
@@ -206,10 +197,10 @@ def choose(screen, clock, controller, title, options, subtitle=None,
             is_sel = (i == selected)
             surf = item_font.render(label, True, ui.TEXT_COLOR)
             rect = surf.get_rect(center=(cx, start_y + i * gap))
-            if is_sel:
-                box = rect.inflate(80, 28)
-                pygame.draw.rect(screen, ui.HILITE_BG, box, border_radius=8)
-                pygame.draw.rect(screen, ui.TEXT_COLOR, box, 3, border_radius=8)
+            # if is_sel:
+            #     box = rect.inflate(80, 28)
+            #     pygame.draw.rect(screen, ui.HILITE_BG, box, border_radius=10)
+            #     pygame.draw.rect(screen, ui.ACCENT, box, 3, border_radius=10)
             screen.blit(surf, rect)
 
         if hint:
@@ -246,25 +237,31 @@ def countdown(screen, clock, controller, game, seconds=COUNTDOWN_SECONDS):
 
         # Anything the player did before the game began is stale by definition,
         # including menu tokens -- the game is already chosen.
+        if controller.check_back():
+            return BACK_TO_MENU
         controller.drain()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                return False
 
-        screen.fill(ui.BG_COLOR)
+        ui.draw_background(screen)
 
-        title_surf = title_font.render(f"Get ready: {game.name}", True, ui.TEXT_COLOR)
-        screen.blit(title_surf, title_surf.get_rect(center=(cx, cy - 170)))
+        title_surf = ui.render_text(f"Gjør deg klar: {game.name}", title_font, offset=2)
+        ui.blit_center(screen, title_surf, (cx, cy - 195))
+
+        # A disc and ring behind the number frame the count.
+        R = 150
+        disc = pygame.Surface((R * 2, R * 2), pygame.SRCALPHA)
+        pygame.draw.circle(disc, (10, 40, 62, 190), (R, R), R)
+        screen.blit(disc, disc.get_rect(center=(cx, cy)))
+        pygame.draw.circle(screen, ui.ACCENT, (cx, cy), R, 6)
+        pygame.draw.circle(screen, ui.PANEL_EDGE, (cx, cy), R - 12, 2)
 
         # Ceiling, so a 3s countdown reads 3 - 2 - 1 rather than 2 - 1 - 0.
-        count_surf = count_font.render(str(-(-remaining_ms // 1000)), True, ui.TEXT_COLOR)
-        screen.blit(count_surf, count_surf.get_rect(center=(cx, cy)))
-
-        hint_surf = hint_font.render("ESC to cancel", True, ui.TEXT_COLOR)
-        screen.blit(hint_surf, hint_surf.get_rect(center=(cx, WINDOW_SIZE[1] - 70)))
+        count_surf = ui.render_text(str(-(-remaining_ms // 1000)), count_font,
+                                    offset=4)
+        ui.blit_center(screen, count_surf, (cx, cy))
 
         pygame.display.update()
         clock.tick(60)
@@ -293,81 +290,115 @@ def show_result(screen, clock, controller, game, result):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    return False
-                return True
 
-        screen.fill(ui.BG_COLOR)
+        ui.draw_background(screen)
 
-        title_surf = title_font.render("Game Over", True, ui.TEXT_COLOR)
-        screen.blit(title_surf, title_surf.get_rect(center=(cx, 200)))
+        panel = pygame.Rect(0, 0, 760, 300)
+        panel.center = (cx, WINDOW_SIZE[1] // 2 - 20)
+        ui.draw_panel(screen, panel)
 
-        sub_surf = sub_font.render(f"{game.name}    {game.result_text(result)}",
-                                   True, ui.TEXT_COLOR)
-        screen.blit(sub_surf, sub_surf.get_rect(center=(cx, 290)))
+        title_surf = ui.render_text("Game Over", title_font, ui.ACCENT, offset=3)
+        ui.blit_center(screen, title_surf, (cx, panel.top + 90))
 
-        hint_surf = hint_font.render("Trykk en knapp for meny", True, ui.TEXT_COLOR)
-        screen.blit(hint_surf, hint_surf.get_rect(center=(cx, WINDOW_SIZE[1] - 70)))
+        sub_surf = ui.render_text(f"{game.name}    {game.result_text(result)}",
+                                  sub_font)
+        ui.blit_center(screen, sub_surf, (cx, panel.centery + 30))
+
+        hint_surf = ui.render_text("Trykk en knapp for meny", hint_font,
+                                   ui.TEXT_MUTED)
+        ui.blit_center(screen, hint_surf, (cx, WINDOW_SIZE[1] - 70))
 
         pygame.display.update()
         clock.tick(60)
-# The four DK buttons in their physical 2x2 layout. Each entry is the button
-# label, the two text lines under it, and the menu token it selects (None = the
-# button does nothing on this screen). Order is row-major: top-left, top-right,
-# bottom-left, bottom-right -- matching the board's BTN0/1 over BTN2/3.
+# One entry per DK button, indexed by button number (BTN0..BTN3). Each entry is
+# the button label, the game name and input method, and the menu token it
+# selects (None = the button starts no game -- BTN0 is "back"). The DK is held
+# sideways, so _draw_mini_dk() places these into their physical positions.
 
 
 
 MENU_GRID = [
-    ("BTN0", "Snake", "(bevegelse)", "SNAKE_GESTURE"),
-    ("BTN1", "Snake", "(stemme)", "SNAKE_VOICE"),
-    ("BTN2", "", "", None),
-    ("BTN3", "Minesweeper", "(stemme)", "MINESWEEPER"),
+    ("BTN0", "", "", None),
+    ("BTN1", "Snake", "(bevegelse)", "SNAKE_GESTURE"),
+    ("BTN2", "Minesweeper", "(stemme)", "MINESWEEPER"),
+    ("BTN3", "Snake", "(stemme)", "SNAKE_VOICE"),
 ]
 
-def _draw_button(screen, rect, label, selected, enabled, btn_font):
-    """Draw one DK-style push button: a light keycap with a round cap on top."""
-    # Colours chosen to read like the real board's white tactile switches.
-    base = (235, 235, 235) if enabled else (90, 90, 90)
-    cap = (250, 250, 250) if enabled else (110, 110, 110)
-    edge = (40, 40, 40)
-    ring = ui.TEXT_COLOR if selected else edge
+# Order the games appear in the list, by BTN index: both Snakes together, then
+# Minesweeper. Display only -- each row's mini-DK still shows its real button.
+MENU_ORDER = [1, 3, 2]
 
-    # Square keycap base with a subtle border.
-    pygame.draw.rect(screen, base, rect, border_radius=10)
-    pygame.draw.rect(screen, ring, rect, 5 if selected else 3, border_radius=10)
+def _draw_mini_dk(screen, rect, active_index, btn_font):
+    """A small nRF54LM20 DK: a 2x2 of buttons, the selecting one lit in accent,
+    the other three greyed out. `active_index` is the MENU_GRID button index.
 
-    # Round pressable cap in the middle.
-    cx, cy = rect.center
-    r = min(rect.width, rect.height) // 3
-    pygame.draw.circle(screen, cap, (cx, cy), r)
-    pygame.draw.circle(screen, edge, (cx, cy), r, 3)
+    The DK is held sideways, so the 2x2 reads BTN1 BTN3 / BTN0 BTN2.
+    """
+    pygame.draw.rect(screen, (10, 26, 48), rect, border_radius=12)
+    pygame.draw.rect(screen, (44, 92, 138), rect, 2, border_radius=12)
 
-    # Button name on the cap.
-    label_color = (30, 30, 30) if enabled else (150, 150, 150)
-    surf = btn_font.render(label, True, label_color)
-    screen.blit(surf, surf.get_rect(center=(cx, cy)))
+    # Screen cell (TL, TR, BL, BR) -> the MENU_GRID button index that sits there.
+    layout = (1, 3, 0, 2)
+    pad, gap = 14, 12
+    bw = (rect.width - 2 * pad - gap) // 2
+    bh = (rect.height - 2 * pad - gap) // 2
+    for j in range(4):
+        row, col = divmod(j, 2)
+        brect = pygame.Rect(rect.x + pad + col * (bw + gap),
+                            rect.y + pad + row * (bh + gap), bw, bh)
+        btn_index = layout[j]
+        if btn_index == active_index:
+            pygame.draw.rect(screen, ui.ACCENT, brect, border_radius=8)
+            pygame.draw.rect(screen, (150, 110, 0), brect, 2, border_radius=8)
+            txt_col = (40, 30, 0)
+        else:
+            pygame.draw.rect(screen, (58, 66, 80), brect, border_radius=8)
+            pygame.draw.rect(screen, (34, 40, 52), brect, 2, border_radius=8)
+            txt_col = (140, 146, 156)
+        label = btn_font.render(MENU_GRID[btn_index][0], True, txt_col)
+        screen.blit(label, label.get_rect(center=brect.center))
 
-def _draw_dk_board(screen, board_rect):
-    """Draw the top half of a stylised DK board (the bottom runs off-screen)."""
-    # PCB-plate (Nordic-aktig mørk blå), med en lysere kant rundt.
-    pygame.draw.rect(screen, (10, 26, 48), board_rect.inflate(12, 12),
-                     border_radius=22)
-    pygame.draw.rect(screen, (18, 42, 74), board_rect, border_radius=18)
 
-    # Skruehull i de to øvre hjørnene (de nedre er utenfor skjermen).
-    for corner in (board_rect.topleft, board_rect.topright):
-        ox = 18 if corner[0] == board_rect.left else -18
-        pygame.draw.circle(screen, (8, 20, 38), (corner[0] + ox, corner[1] + 18), 8)
+def _draw_game_row(screen, rect, grid_i, btn_label, name, sub_label, selected,
+                   name_font, sub_font, mini_font):
+    """One list row: a mini DK (button to press highlighted) plus the game."""
+    radius = 18
+
+    shadow = pygame.Surface((rect.width, rect.height + 8), pygame.SRCALPHA)
+    pygame.draw.rect(shadow, (0, 0, 0, 80), shadow.get_rect(),
+                     border_radius=radius)
+    screen.blit(shadow, (rect.x, rect.y + 8))
+
+    pygame.draw.rect(screen, ui.PANEL_BG, rect, border_radius=radius)
+    # if selected:
+    #     pygame.draw.rect(screen, ui.ACCENT, rect.inflate(12, 12), 5,
+    #                      border_radius=radius + 5)
+    #     pygame.draw.rect(screen, ui.ACCENT, rect, 3, border_radius=radius)
+    # else:
+    pygame.draw.rect(screen, ui.PANEL_EDGE, rect, 2, border_radius=radius)
+
+    # Mini DK on the left, showing which button selects this game.
+    mini = pygame.Rect(0, 0, rect.height - 30, rect.height - 30)
+    mini.midleft = (rect.left + 24, rect.centery)
+    _draw_mini_dk(screen, mini, grid_i, mini_font)
+
+    # Game name + input method to the right of the diagram.
+    text_x = mini.right + 34
+    name_surf = name_font.render(name, True, ui.TEXT_COLOR)
+    screen.blit(name_surf,
+                name_surf.get_rect(midleft=(text_x, rect.centery - 22)))
+    if sub_label:
+        sub_surf = sub_font.render(sub_label, True, ui.TEXT_MUTED)
+        screen.blit(sub_surf,
+                    sub_surf.get_rect(midleft=(text_x, rect.centery + 24)))
 
 def main_menu(screen, clock, controller, token_map):
-    """Child-friendly main menu: a picture of the DK with its buttons.
+    """Main menu: a vertical list of the games.
 
-    The board is drawn with a mic on top and a USB cable below. The four
-    tactile switches sit in their real spot -- a 2x2 block in the top-right
-    corner (BTN0/1 over BTN2/3) -- each with the game it starts written below.
-    Returns the chosen game (via token_map), or None if the player quit.
+    Each row pairs the game with a small nRF54LM20 DK diagram whose four
+    buttons show which one to press -- the selecting button is highlighted and
+    the other three greyed out. Returns the chosen game (via token_map), or None
+    if the player quit.
     """
     try:
         logo = pygame.image.load("Graphics/nod.png").convert_alpha()
@@ -379,36 +410,22 @@ def main_menu(screen, clock, controller, token_map):
         print(f"[menu] kunne ikke laste logo: {exc}")
         logo = None
 
-    title_font = ui.font(72)
-    btn_font = ui.font(26)
-    label_font = ui.font(28)
-    sub_font = ui.font(20)
+    title_font = ui.font(58)
+    name_font = ui.font(38, ui.FONT_DISPLAY)
+    sub_font = ui.font(24)
+    mini_font = ui.font(15, ui.FONT_DISPLAY)
 
     win_w, win_h = WINDOW_SIZE
     cx = win_w // 2
 
-    # Only the top half of the board shows: it starts under the title and its
-    # bottom runs off the bottom of the window, so no USB cable is needed.
-    board_w = 680
-    board_rect = pygame.Rect(cx - board_w // 2, 200, board_w, win_h)
+    # The playable games in list order, keeping each one's physical button
+    # position (its MENU_GRID index) so the mini-DK lights the right button.
+    games = [(i, MENU_GRID[i]) for i in MENU_ORDER if MENU_GRID[i][3] is not None]
 
-    # 2x2 button block in the board's top-right corner, like the real switches.
-    btn_size = 250
-    cap_h = 55                 # space under each button for its two text lines
-    gap_x, gap_y = 40, 40
-    cell_w = btn_size + gap_x
-    cell_h = btn_size + cap_h + gap_y
-    grid_w = cell_w * 2 - gap_x
-    grid_x = board_rect.right - 45 - grid_w
-    grid_y = board_rect.top + 50
+    row_w, row_h, row_gap = 740, 170, 34
+    total_h = len(games) * row_h + (len(games) - 1) * row_gap
+    start_y = 250
 
-    def button_rect(i):
-        row, col = divmod(i, 2)
-        x = grid_x + col * cell_w
-        y = grid_y + row * cell_h
-        return pygame.Rect(x, y, btn_size, btn_size)
-
-    playable = [i for i, cell in enumerate(MENU_GRID) if cell[3] is not None]
     selected = 0
 
     while True:
@@ -421,39 +438,26 @@ def main_menu(screen, clock, controller, token_map):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return None
-            if event.type == pygame.KEYDOWN:
-                if event.key in (pygame.K_UP, pygame.K_w,
-                                 pygame.K_LEFT, pygame.K_a):
-                    selected = (selected - 1) % len(playable)
-                elif event.key in (pygame.K_DOWN, pygame.K_s,
-                                   pygame.K_RIGHT, pygame.K_d):
-                    selected = (selected + 1) % len(playable)
-                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                    return token_map[MENU_GRID[playable[selected]][3]]
-                elif event.key == pygame.K_ESCAPE:
-                    return None
 
         # ---- draw ----
-        screen.fill(ui.BG_COLOR)
+        ui.draw_background(screen)
 
-        title_surf = title_font.render("Edge AI Games", True, ui.TEXT_COLOR)
-        screen.blit(title_surf, title_surf.get_rect(center=(cx, 90)))
+        title_surf = ui.render_text("Nordic Edge AI Spill", title_font, offset=3)
+        ui.blit_center(screen, title_surf, (cx, 96))
+        sub_surf = ui.render_text(
+            "Trykk knappen på DK-en for å starte spillet",
+            sub_font, ui.TEXT_MUTED, offset=1)
+        ui.blit_center(screen, sub_surf, (cx, 156))
 
-        # The board goes down first, so the buttons sit on top of it.
-        _draw_dk_board(screen, board_rect)
+        for k, (grid_i, cell) in enumerate(games):
+            btn_label, name, sub_label, tok = cell
+            rect = pygame.Rect(cx - row_w // 2,
+                               start_y + k * (row_h + row_gap), row_w, row_h)
+            _draw_game_row(screen, rect, grid_i, btn_label, name, sub_label,
+                           k == selected, name_font, sub_font, mini_font)
 
-        for i, (btn, line1, line2, tok) in enumerate(MENU_GRID):
-            rect = button_rect(i)
-            enabled = tok is not None
-            is_sel = enabled and playable[selected] == i
-
-            # Game name goes on the button itself now, not "BTN0" etc.
-            _draw_button(screen, rect, line1, is_sel, enabled, btn_font)
-
-            # Only the sub-line (input method) stays under the button.
-            if line2:
-                l2 = sub_font.render(line2, True, ui.TEXT_COLOR)
-                screen.blit(l2, l2.get_rect(center=(rect.centerx, rect.bottom + 24)))
+        if logo is not None:
+            ui.blit_center(screen, logo, (cx, win_h - 100))
 
         pygame.display.update()
         clock.tick(60)
@@ -488,17 +492,31 @@ def run_app(screen, clock, controller):
         # here shows them: from the main menu (which clears `played` below), or
         # by picking a different game with a button on the game-over screen.
         if game is not played:
-            if not instructions.show(screen, clock, controller, game):
+            res = instructions.show(screen, clock, controller, game)
+            if res is False:            # window closed / ESC -> quit app
                 return
+            if res is BACK_TO_MENU:     # hold to go back -> main menu
+                game = None
+                played = None
+                continue
 
         # --- countdown, so a just-pressed engine switch has time to land ---
-        if not countdown(screen, clock, controller, game):
+        res = countdown(screen, clock, controller, game)
+        if res is False:
             return
+        if res is BACK_TO_MENU:
+            game = None
+            played = None
+            continue
 
         controller.set_score_game(game.score_game)
         result = game.run(screen, clock, controller)
         if result is None:      # window closed mid-game -> quit app
             return
+        if result is BACK_TO_MENU:   # controller BACK -> straight to menu
+            game = None
+            played = None
+            continue
         played = game
 
         # --- game over: show the result, then back to the main menu ---

@@ -23,12 +23,13 @@ toggle mines, SPACE commits. ESC gives up and returns the time so far.
 
 import pygame
 import ui
+from controller import BACK_TO_MENU
 
 from .config import (
     WIDTH, HEIGHT, MARGIN, MENU_SIZE, LABEL_SIZE, LEFT_CLICK, RIGHT_CLICK,
-    DIFFICULTIES, GREEN1
+    DIFFICULTIES, MS_FACE, MS_TEXT, RED1, NORDIC_BLUE
 )
-from .game import Game
+from .game import Game, draw_bevel
 from .menu import Menu
 
 # Width reserved down the left of the window for the help box; the board is
@@ -126,7 +127,7 @@ def handle_voice_input(game, state, controller):
             state["column"] = None
 
 
-def draw_info(screen):
+def draw_info(screen, logo=None):
     """Tegn en hjelpetekst i en boks til venstre for brettet."""
     title_font = ui.font(26)
     text_font = ui.font(18)
@@ -134,15 +135,17 @@ def draw_info(screen):
     box_x = 15
     box_y = 90
     box_w = 250
-    # Sized to the text rather than hardcoded, so lines can be added above.
+    # Sized to the text plus the logo below it, not the whole column.
     box_h = 40 + sum(14 if not text else
                      (title_font if is_title else text_font).get_height() + 6
                      for text, is_title in _HELP_LINES)
+    if logo is not None:
+        box_h += logo.get_height() + 40
 
     # Bakgrunn + ramme
     box = pygame.Rect(box_x, box_y, box_w, box_h)
-    pygame.draw.rect(screen, (200, 195, 210), box, border_radius=12)
-    pygame.draw.rect(screen, (80, 40, 40), box, 3, border_radius=12)
+    pygame.draw.rect(screen, MS_FACE, box)
+    draw_bevel(screen, box, raised=True)
 
     # Tekst
     x = box_x + 18
@@ -152,10 +155,14 @@ def draw_info(screen):
             y += 14
             continue
         f = title_font if is_title else text_font
-        color = (180, 60, 60) if is_title else (40, 40, 40)
+        color = RED1 if is_title else MS_TEXT
         surf = f.render(text, True, color)
         screen.blit(surf, (x, y))
         y += f.get_height() + 6
+
+    # Nordic logo just below the end of the help text.
+    if logo is not None:
+        screen.blit(logo, logo.get_rect(midtop=(box.centerx, y + 20)))
 
 
 def _layout(screen, game):
@@ -179,6 +186,13 @@ def run(screen, clock, controller):
     """Play one round; see the module docstring for the return value."""
     font = ui.font(24)
 
+    try:
+        logo = pygame.image.load("Graphics/nod.png").convert_alpha()
+        logo = pygame.transform.smoothscale(
+            logo, (150, int(150 * logo.get_height() / logo.get_width())))
+    except (pygame.error, FileNotFoundError):
+        logo = None
+
     game = Game()
     menu = Menu()
     board_surf, scaled_size, offset = _layout(screen, game)
@@ -193,6 +207,8 @@ def run(screen, clock, controller):
         screen.blit(pygame.transform.smoothscale(board_surf, scaled_size), offset)
 
     while True:
+        if controller.check_back():
+            return BACK_TO_MENU
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return None            # window closed -> main.py quits the app
@@ -209,40 +225,25 @@ def run(screen, clock, controller):
                         #bombe hvis uten bombe, ikke bombe hvis det er en bombe der allerede
                         cell.has_bomb = not cell.has_bomb
 
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    return game.get_elapsed_time()   # gir opp
-                elif event.key == pygame.K_m:
-                    game.setup_mode=True
-                    game.reset_game()
-                    print("Oppsett-modus: klikk for å plassere bomber. Trykk mellomrom når du er fornøyd.")
-                elif event.key == pygame.K_SPACE and game.setup_mode:
-                    game.setup_mode=False
-                    game.count_all_bombs() #regner ut nabotallene
-                    count = 0
-                    for r in game.grid:
-                        for cell in r:
-                            if cell.has_bomb:
-                                count+=1
-                    game.num_bombs=count
-                    game.init=True #hopper over utplassering av bomber
-
         handle_voice_input(game, state, controller)
 
         # set_difficulty() may have swapped in a different board.
         if board_surf.get_size() != game.board_pixel_size():
             board_surf, scaled_size, offset = _layout(screen, game)
 
-        screen.fill(GREEN1)
-        draw_info(screen)
+        screen.fill(NORDIC_BLUE)
+        draw_info(screen, logo)
         game.draw(board_surf, font, state)
         menu.draw(board_surf, font, game, state["mode"])
         blit_board()
 
         if game.game_won or game.game_lost:
             seconds = game.get_elapsed_time()
-            if game.game_won and controller.score_game is not None:
-                controller.send_score(controller.score_game, seconds)
+            # Report cleared tiles (primary) and time (tie-break) on win OR
+            # loss, so every attempt lands on the leaderboard.
+            if controller.score_game is not None:
+                controller.send_score(controller.score_game,
+                                      game.cleared_count(), {"time": seconds})
             pygame.display.flip()
             pygame.time.delay(1500)   # la spilleren se resultatet
             return seconds

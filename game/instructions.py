@@ -32,6 +32,7 @@ from collections import namedtuple
 import pygame
 
 import ui
+from controller import BACK_TO_MENU
 
 # Every instruction image is scaled to this height, keeping its aspect ratio,
 # and laid out in a single centred row. The window is 1026x1026 (snake's grid),
@@ -137,10 +138,13 @@ def show(screen, clock, controller, game):
         if guide.advance is not None and guide.advance(controller):
             return True
 
-        # The game's own button starts it: btn0 (SNAKE) on Snake's page, etc.
-        # Its menu token matches the game name. Checked before drain(), which
-        # would otherwise empty the queue.
-        if controller.get_menu() == game.token:
+        # The game's own button starts it: its menu token matches the game.
+        # A held BACK returns to the menu. Checked before drain(), which would
+        # otherwise empty the queue.
+        tok = controller.get_menu()
+        if tok == "BACK":
+            return BACK_TO_MENU
+        if tok == game.token:
             return True
 
         # Everything else -- swipes, spoken numbers, other buttons -- means
@@ -150,23 +154,18 @@ def show(screen, clock, controller, game):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
-            if event.type == pygame.KEYDOWN:
-                if event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                    return True
-                if event.key == pygame.K_ESCAPE:
-                    return False
 
         # ---- draw ---------------------------------------------------------
-        screen.fill(ui.BG_COLOR)
+        ui.draw_background(screen)
 
-        title_surf = title_font.render(f"How to play: {game.name}", True, ui.TEXT_COLOR)
+        title_surf = ui.render_text(f"Hvordan spille: {game.name}", title_font, offset=2)
         screen.blit(title_surf, title_surf.get_rect(center=(cx, 100)))
 
         # Body text, left-aligned and wrapped, with a gap between paragraphs.
         y = 210
         for line in guide.lines:
             for wrapped in ui.wrap_text(line, line_font, width - 2 * margin):
-                surf = line_font.render(wrapped, True, ui.TEXT_COLOR)
+                surf = ui.render_text(wrapped, line_font, ui.TEXT_COLOR, offset=1)
                 screen.blit(surf, surf.get_rect(midleft=(margin, y)))
                 y += line_font.get_linesize() + 6
             y += 16
@@ -184,7 +183,7 @@ def show(screen, clock, controller, game):
                 x += img.get_width() + IMAGE_GAP
 
         hint = guide.advance_hint or "Trykk samme knapp igjen for å starte"
-        hint_surf = hint_font.render(hint, True, ui.TEXT_COLOR)
+        hint_surf = ui.render_text(hint, hint_font, ui.TEXT_MUTED)
         screen.blit(hint_surf, hint_surf.get_rect(center=(cx, hint_y)))
 
         pygame.display.update()

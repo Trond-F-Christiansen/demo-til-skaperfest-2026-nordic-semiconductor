@@ -9,9 +9,55 @@ import pygame
 
 from .config import (
     WIDTH, HEIGHT, NSQUARES, MARGIN, MENU_SIZE,
-    GREEN1, WHITE, RED1, RED, GRAY,
-    LEFT_CLICK, RIGHT_CLICK, LABEL_SIZE, NUM_BOMBS, HIGHLIGHT,  NUMBER_COLORS
+    GREEN1, RED1, RED,
+    LEFT_CLICK, RIGHT_CLICK, LABEL_SIZE, NUM_BOMBS, HIGHLIGHT, NUMBER_COLORS,
+    MS_BG, MS_FACE, MS_LIGHT, MS_SHADOW, MS_OPEN, MS_OPEN_EDGE, MS_TEXT,
+    NORDIC_BLUE,
 )
+
+
+def draw_bevel(surface, rect, raised=True, width=3):
+    """Classic Minesweeper 3D edge: light top-left, dark bottom-right."""
+    light = MS_LIGHT if raised else MS_SHADOW
+    dark = MS_SHADOW if raised else MS_LIGHT
+    x, y, w, h = rect
+    for i in range(width):
+        pygame.draw.line(surface, light, (x + i, y + i), (x + w - 1 - i, y + i))
+        pygame.draw.line(surface, light, (x + i, y + i), (x + i, y + h - 1 - i))
+        pygame.draw.line(surface, dark, (x + i, y + h - 1 - i),
+                         (x + w - 1 - i, y + h - 1 - i))
+        pygame.draw.line(surface, dark, (x + w - 1 - i, y + i),
+                         (x + w - 1 - i, y + h - 1 - i))
+
+
+def draw_mine(surface, rect):
+    """A classic black bomb with spikes and a white glint."""
+    cx, cy = rect.center
+    r = max(3, min(rect.width, rect.height) // 3)
+    d = int(r * 0.95)
+    for dx, dy in ((r + 3, 0), (-(r + 3), 0), (0, r + 3), (0, -(r + 3)),
+                   (d, d), (d, -d), (-d, d), (-d, -d)):
+        pygame.draw.line(surface, (0, 0, 0), (cx, cy), (cx + dx, cy + dy), 2)
+    pygame.draw.circle(surface, (0, 0, 0), (cx, cy), r)
+    pygame.draw.circle(surface, (255, 255, 255), (cx - r // 3, cy - r // 3),
+                       max(2, r // 4))
+
+
+def draw_flag(surface, rect):
+    """A red pennant on a black pole, classic Minesweeper flag."""
+    x, y, w, h = rect
+    pole_x = int(x + w * 0.56)
+    pygame.draw.rect(surface, (0, 0, 0),
+                     (int(x + w * 0.28), int(y + h * 0.70),
+                      int(w * 0.44), max(2, int(h * 0.12))))
+    pygame.draw.line(surface, (0, 0, 0), (pole_x, int(y + h * 0.24)),
+                     (pole_x, int(y + h * 0.72)), 2)
+    pygame.draw.polygon(surface, (200, 0, 0), [
+        (pole_x, int(y + h * 0.22)),
+        (pole_x, int(y + h * 0.50)),
+        (int(x + w * 0.30), int(y + h * 0.36)),
+    ])
+
 
 class Game:
     def __init__(self):
@@ -49,6 +95,11 @@ class Game:
         else:
             return (self.end_time-self.start_time)//1000
 
+    def cleared_count(self):
+        """Number of safe (non-bomb) tiles the player has opened."""
+        return sum(1 for row in self.grid for cell in row
+                   if cell.is_visible and not cell.has_bomb)
+
     def set_difficulty(self, size, bombs):
         """Bytt brettstørrelse og antall bomber, og start på nytt.
 
@@ -64,34 +115,44 @@ class Game:
         self.reset_game()
 
     def draw(self, screen, font, state=None):
-            screen.fill(GREEN1)
+            screen.fill(NORDIC_BLUE)
             for row in range(self.squares_y):
                 for column in range(self.squares_x):
-                    
-                    color = WHITE
-                    if self.grid[row][column].is_visible:
-                        color = RED if self.grid[row][column].has_bomb else GRAY
-                    elif self.grid[row][column].has_flag:
-                        color = RED1
-                    if self.setup_mode and self.grid[row][column].has_bomb:
-                        color = RED1
-                    pygame.draw.rect(screen, color,
-                                    [(MARGIN + WIDTH) * column + MARGIN + LABEL_SIZE,
-                                    (MARGIN + HEIGHT) * row + MARGIN + MENU_SIZE + LABEL_SIZE,
-                                    WIDTH, HEIGHT])
+                    cell = self.grid[row][column]
+                    rect = pygame.Rect(
+                        (MARGIN + WIDTH) * column + MARGIN + LABEL_SIZE,
+                        (MARGIN + HEIGHT) * row + MARGIN + MENU_SIZE + LABEL_SIZE,
+                        WIDTH, HEIGHT)
+
+                    if cell.is_visible:
+                        # Opened: flat, sunken. A tripped mine sits on red.
+                        pygame.draw.rect(
+                            screen, RED if cell.has_bomb else MS_OPEN, rect)
+                        pygame.draw.rect(screen, MS_OPEN_EDGE, rect, 1)
+                        if cell.has_bomb:
+                            draw_mine(screen, rect)
+                    else:
+                        # Unopened: raised bevel; setup mode reveals bombs.
+                        face = RED1 if (self.setup_mode and cell.has_bomb) \
+                            else MS_FACE
+                        pygame.draw.rect(screen, face, rect)
+                        draw_bevel(screen, rect, raised=True)
+                        if cell.has_flag:
+                            draw_flag(screen, rect)
+
                     self.grid[row][column].show_text(screen, font)
 
             # Kolonnenummer langs toppen (under menyen, over brettet), tallene som viser koordinatsystemet
             for column in range(self.squares_x):
-                label = font.render(str(column), True, WHITE)
+                label = font.render(str(column), True, MS_TEXT)
                 x = (MARGIN + WIDTH) * column + MARGIN + LABEL_SIZE + WIDTH // 3
                 y = MENU_SIZE + LABEL_SIZE - 18
                 screen.blit(label, (x, y))
 
             # Radnummer langs venstre side
             for row in range(self.squares_y):
-                label = font.render(str(row), True, WHITE)
-                x = LABEL_SIZE - 12 
+                label = font.render(str(row), True, MS_TEXT)
+                x = LABEL_SIZE - 12
                 y = (MARGIN + HEIGHT) * row + MARGIN + MENU_SIZE + LABEL_SIZE + HEIGHT // 4
                 screen.blit(label, (x, y))
             #markerer rad som er sagt høyt
@@ -187,9 +248,9 @@ class Game:
                 self.grid[row][column].has_flag = False
                 if self.grid[row][column].has_bomb:
                     self.game_over()
-                    self.game_lost = True 
+                    self.game_lost = True
                     self.end_time = pygame.time.get_ticks()
-        
+
                 if (self.grid[row][column].bomb_count == 0
                         and not self.grid[row][column].has_bomb):
                     self.grid[row][column].open_neighbours(
@@ -231,7 +292,7 @@ class Game:
                         screen.blit(self.text,
                                     (self.x * (WIDTH + MARGIN) + 12 + LABEL_SIZE,
                                     self.y * (HEIGHT + MARGIN) + 10 + MENU_SIZE + LABEL_SIZE))
-        
+
         def count_bombs(self, game, squaresx, squaresy):
             if not self.test:
                 self.test = True

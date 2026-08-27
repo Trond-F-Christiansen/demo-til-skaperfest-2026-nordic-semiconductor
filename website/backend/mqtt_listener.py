@@ -62,10 +62,12 @@ state_updated_at = 0
 
 def ensure_output_dirs():
     WEBSITE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    source_index = STATIC_SOURCE_DIR / "index.html"
-    destination_index = WEBSITE_OUTPUT_DIR / "index.html"
-    if source_index != destination_index:
-        shutil.copyfile(source_index, destination_index)
+    if STATIC_SOURCE_DIR != WEBSITE_OUTPUT_DIR:
+        # Refresh the served static files (page + assets) on every start.
+        for name in ("index.html", "nordic-logo.png"):
+            source = STATIC_SOURCE_DIR / name
+            if source.exists():
+                shutil.copyfile(source, WEBSITE_OUTPUT_DIR / name)
     PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -145,18 +147,26 @@ def sort_leaderboard(game, entries):
 
     newest = max(entries, key=lambda row: row["received_at"])
     older_entries = [entry for entry in entries if entry is not newest]
-    older_entries.sort(key=lambda row: row["score"], reverse=(GAMES[game] == "desc"))
+    if game == "minesweeper":
+        # Most tiles cleared first, then the fastest time.
+        older_entries.sort(key=lambda row: (-row["score"], row.get("time", 0)))
+    else:
+        older_entries.sort(key=lambda row: row["score"],
+                           reverse=(GAMES[game] == "desc"))
     return [newest, *older_entries]
 
 
-def add_to_leaderboard(game, score, photo_filename, player_alias):
-    leaderboards[game].append({
+def add_to_leaderboard(game, score, photo_filename, player_alias, extra=None):
+    entry = {
         "entry_id": secrets.token_hex(8),
         "player_alias": player_alias,
         "score": score,
         "photo_filename": photo_filename,
         "received_at": time.time_ns(),
-    })
+    }
+    if extra:
+        entry.update(extra)
+    leaderboards[game].append(entry)
     leaderboards[game] = sort_leaderboard(game, leaderboards[game])
     dropped = leaderboards[game][LEADERBOARD_SIZE:]
     leaderboards[game] = leaderboards[game][:LEADERBOARD_SIZE]
@@ -177,6 +187,12 @@ def handle_score(game, payload):
         score = data["score"]
         if not isinstance(score, (int, float)) or isinstance(score, bool):
             raise ValueError("score must be a number")
+        extra = {}
+        if game == "minesweeper":
+            elapsed = data.get("time", 0)
+            if not isinstance(elapsed, (int, float)) or isinstance(elapsed, bool):
+                raise ValueError("time must be a number")
+            extra["time"] = elapsed
     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
         print("Malformed score message, ignoring")
         return False
@@ -190,7 +206,7 @@ def handle_score(game, payload):
     with (PHOTOS_DIR / filename).open("wb") as f:
         f.write(photo_payload)
 
-    add_to_leaderboard(game, score, filename, new_player_alias())
+    add_to_leaderboard(game, score, filename, new_player_alias(), extra)
     save_state()
     print(f"Added {game} score {score} with a random photo")
     return True
